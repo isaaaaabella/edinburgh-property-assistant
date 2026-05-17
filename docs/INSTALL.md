@@ -1,108 +1,113 @@
-# 安装
+# Install
 
-## 系统要求
+**English** · [中文](INSTALL.zh.md)
 
-- macOS 或 Linux（Windows 没测过）
+## Requirements
+
+- macOS or Linux (Windows untested)
 - Python 3.9+
-- [Claude Code](https://www.anthropic.com/claude-code) CLI 或 Desktop
-- `poppler`（PDF 工具，`parse_home_report.py` 用到）
+- [Claude Code](https://www.anthropic.com/claude-code) CLI or Desktop
+- `poppler` (PDF utilities, used by `parse_home_report.py`)
   - macOS: `brew install poppler`
   - Ubuntu: `sudo apt-get install poppler-utils`
 
-## 步骤
+## Steps
 
-### 1. clone + 安装依赖
+### 1. Clone + install dependencies
 
 ```bash
-git clone <repo-url> ~/.claude/property_assistant
+git clone https://github.com/isaaaaabella/edinburgh-property-assistant ~/.claude/property_assistant
 cd ~/.claude/property_assistant
 pip install -r requirements.txt
 ```
 
-### 2. 配置 .env（零配置即可）
+### 2. Configure `.env` (zero-config works out of the box)
 
 ```bash
 cp .env.example .env
 ```
 
-默认 `.env` 只有 `STORAGE_BACKEND=local`，不需要任何 token。数据会存到 `~/.property_data/`。
+The default `.env` only has `STORAGE_BACKEND=local` and needs no tokens. Data will be stored in `~/.property_data/`.
 
-**同时复制 preferences 模板**（含你的买房偏好和评分权重）：
+**Also copy the preferences template** (your buying preferences + scoring weights):
 ```bash
 cp preferences.example.json preferences.json
 ```
 
-打开 `preferences.json` 改顶部 5 个字段：
-- `bedrooms_preferred` / `floor_min` / `gas_required` — 硬性筛选条件
-- `target_schools` — 你看重的学区列表
-- `commute.user_label` / `user_workplace` / `partner_label` / `partner_workplace` — 通勤地（带 postcode）
+Open `preferences.json` and edit the top 5 fields:
+- `bedrooms_preferred` / `floor_min` / `gas_required` — hard filter conditions
+- `target_schools` — list of school catchments you care about
+- `commute.user_label` / `user_workplace` / `partner_label` / `partner_workplace` — commute addresses (include postcode)
 
-如果不改，scoring 会自动 fallback 到 `preferences.example.json` 的默认值（适合 Edinburgh 南区买家）。`preferences.json` 在 `.gitignore` 里，不会上传到 GitHub。
+If you don't edit, scoring will auto-fallback to the defaults in `preferences.example.json` (tuned for Edinburgh South Side buyers). `preferences.json` is in `.gitignore` — it won't be uploaded to GitHub.
 
-### 3. 注册 SKILL 到 Claude commands 目录
+### 3. Register the SKILLs to Claude commands directory
 
 ```bash
 mkdir -p ~/.claude/commands
-# 如果你的 repo 把 SKILL.md 放在 skills/ 目录：
 ln -s ~/.claude/property_assistant/skills/home-report.md ~/.claude/commands/home-report.md
 ln -s ~/.claude/property_assistant/skills/property.md    ~/.claude/commands/property.md
 ```
 
-（这个 repo 当前布局下，SKILL.md 已经在 `~/.claude/commands/` 里，跳过这步。）
-
-### 4. 验证
+### 4. Verify
 
 ```bash
-# 跑全套测试
+# Run the full test suite
 ./run_tests.sh
 
 # Health check
 python -m property_assistant.orchestrator.router health
-# 应该看到: ✅ backend=local · writable: ~/.property_data
+# Expected: ✅ backend=local · writable: ~/.property_data
 ```
 
-### 5. 第一次跑
+### 5. First run
 
-在 Claude Code 里：
+In Claude Code:
 
 ```
 /home-report ~/Downloads/some_home_report.pdf
 ```
 
-Claude 会按 [`commands/home-report.md`](../../commands/home-report.md) 的步骤：
-1. 调 `parse_home_report.py` 把 PDF 抽成 JSON
-2. 扮演 RICS 评估师生成 `SurveyorOpinion` JSON
-3. CLI validate，失败重试 1 次
-4. 跑 pipeline → 评分 → 渲染 HTML → 入库（local 或 notion）
+Claude follows the steps in [`skills/home-report.md`](../skills/home-report.md):
+1. Calls `parse_home_report.py` to extract PDF → JSON
+2. Plays the RICS surveyor role and generates a `SurveyorOpinion` JSON
+3. Runs the validator CLI; retries once on failure
+4. Runs the pipeline → score → render HTML → store (local or notion)
 
-输出 HTML 路径会在末尾打印。
+The output HTML path is printed at the end.
 
-## 升级到完整工作流
+## Upgrading to the full workflow
 
-零配置版只能用 `/home-report path.pdf`。要用 `/property`（含邮件同步、看房准备、复盘、对比），还需要：
+The zero-config version only supports `/home-report path.pdf`. To use `/property` (with email sync, viewing prep, review, comparison), you also need:
 
-- **Notion**（多设备同步） → [`INTEGRATIONS.md`](INTEGRATIONS.md#notion)
-- **Gmail**（自动抓房产邮件） → [`INTEGRATIONS.md`](INTEGRATIONS.md#gmail)
-- **Google Maps**（精确通勤时间，否则用 postcode 距离粗估） → [`INTEGRATIONS.md`](INTEGRATIONS.md#google-maps)
+- **Notion** (multi-device sync) → [`INTEGRATIONS.md#notion`](INTEGRATIONS.md#notion)
+- **Gmail** (auto-fetch property emails) → [`INTEGRATIONS.md#gmail`](INTEGRATIONS.md#gmail)
+- **Google Maps** (precise commute times; otherwise falls back to postcode distance) → [`INTEGRATIONS.md#google-maps`](INTEGRATIONS.md#google-maps)
 
-## 常见问题
+**Don't have Notion?** That's fine — see [`WITHOUT_NOTION.md`](WITHOUT_NOTION.md) for what's still possible with just LocalJSONStorage.
+
+## Using with other AI coding tools
+
+Codex CLI, Cursor, Continue.dev, Cline, or just curl + GPT-4 — see the main [README](../README.md#using-with-other-ai-coding-tools) for two paths.
+
+## Common issues
 
 ### `pdftotext: command not found`
-poppler 没装。`brew install poppler`（mac）或 `apt-get install poppler-utils`（ubuntu）。
+Poppler isn't installed. `brew install poppler` (macOS) or `apt-get install poppler-utils` (Ubuntu).
 
-### `/property` 报 `NotionAPIError`
-`.env` 里 `STORAGE_BACKEND=notion` 但 token 没填。要么切回 `local`，要么按 INTEGRATIONS.md 配 Notion。
+### `/property` errors with `NotionAPIError`
+`.env` has `STORAGE_BACKEND=notion` but the token isn't set. Either switch back to `local`, or configure Notion per `INTEGRATIONS.md`.
 
 ### `intake failed: fetch_emails.py error`
-Gmail 没配。`/home-report` 不受影响；想用 `/property emails` 需要在 `.env` 加 `GMAIL_USER` + `GMAIL_APP_PASSWORD`。
+Gmail isn't configured. `/home-report` is unaffected; using `/property emails` requires `GMAIL_USER` + `GMAIL_APP_PASSWORD` in `.env`.
 
 ### `SurveyorOpinion validation failed`
-LLM 生成的 JSON 不符合 schema。Claude 会自动读 errors 重试一次，仍失败则 print 详细 errors。常见原因：
-- `cat_notes_contradictions` 没被 `score_corrections` 覆盖（每条 contradiction 都要点名）
-- `fact` 类 Finding 漏了 `evidence_page`
-- 整篇 `judgment` 少于 3 条（变成事实堆砌）
+The LLM's JSON doesn't match the schema. Claude auto-reads the errors and retries once; if that still fails, the detailed errors are printed. Common causes:
+- `cat_notes_contradictions` not covered by `score_corrections` (each contradiction must be cited)
+- `fact`-kind Finding missing `evidence_page`
+- Whole opinion has < 3 `judgment`-kind findings (becomes pure fact-dumping)
 
-修：人工编辑 `/tmp/opinion_$$.json`，rerun pipeline `python -m property_assistant.pipelines.home_report run <pdf> --opinion /tmp/opinion_$$.json`。
+Fix: manually edit `/tmp/opinion_$$.json` and rerun `python -m property_assistant.pipelines.home_report run <pdf> --opinion /tmp/opinion_$$.json`.
 
-### 测试 fail
-跑 `./run_tests.sh` 看 stderr。最常见原因是 `STORAGE_BACKEND` env 污染（前一次跑剩下的）。`unset STORAGE_BACKEND PROPERTY_DATA_DIR` 再重试。
+### Tests fail
+Run `./run_tests.sh` and check stderr. Most common cause: leftover `STORAGE_BACKEND` env from a previous run. Try `unset STORAGE_BACKEND PROPERTY_DATA_DIR` and rerun.

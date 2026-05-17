@@ -133,7 +133,7 @@ sequenceDiagram
   Pipe-->>U: HTML path + summary
 ```
 
-[`docs/INSTALL.md`](docs/INSTALL.md) 有详细安装步骤；[`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) 是各集成（Notion / Gmail / Google Maps）的可选配置。
+[`docs/INSTALL.zh.md`](docs/INSTALL.zh.md) 有详细安装步骤；[`docs/INTEGRATIONS.zh.md`](docs/INTEGRATIONS.zh.md) 是各集成（Notion / Gmail / Google Maps）的可选配置；[`docs/WITHOUT_NOTION.zh.md`](docs/WITHOUT_NOTION.zh.md) 解释了不用 Notion 也能用绝大部分功能。
 
 ---
 

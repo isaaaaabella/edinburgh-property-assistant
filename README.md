@@ -133,7 +133,7 @@ sequenceDiagram
   Pipe-->>U: HTML path + summary
 ```
 
-See [`docs/INSTALL.md`](docs/INSTALL.md) for full install steps and [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) for optional Notion / Gmail / Google Maps setup.
+See [`docs/INSTALL.md`](docs/INSTALL.md) for full install steps, [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) for optional Notion / Gmail / Google Maps setup, and [`docs/WITHOUT_NOTION.md`](docs/WITHOUT_NOTION.md) if you don't want to use Notion (most of the workflow still works).
 
 ---
 
