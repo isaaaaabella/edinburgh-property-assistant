@@ -1,43 +1,45 @@
 # Scottish Property Assistant
 
-苏格兰房产分析与跟踪。一个可分享的 Claude Code skill 集，把 Home Report PDF 翻译成你能读得懂、能据此出价的分析报告。
+**English** · [中文](README.zh.md)
+
+A shareable Claude Code skill suite for Edinburgh property hunting. Turns Scottish Home Report PDFs into surveyor-style analyses you can actually read and bid on.
 
 ```
 /home-report ~/Downloads/your_home_report.pdf
 ```
 
-→ 输出 HTML 分析报告（含资深评估师专业意见的三层卡片视图、维多利亚 Tenement / Pre-1919 苏格兰房产专属判断、出价建议、看房问题清单）。
+→ outputs an HTML report with a senior surveyor's professional opinion (layered cards view), Victorian Tenement / Pre-1919 specific judgment, offer strategy, and viewing-day question list.
 
-**零配置**：不需要 Notion、不需要 Gmail、不需要 Google Maps API key。
+**Zero-config** — no Notion, no Gmail, no Google Maps API key required.
 
 ---
 
-## 两个命令
+## Two commands
 
 ### `/home-report path.pdf`
-**零配置单 PDF 入口**。给一份 Home Report PDF，得到一份 HTML 分析。数据存到 `~/.property_data/`。朋友拿到能立刻跑。
+**Zero-config single-PDF entry point.** Give it a Home Report PDF, get an HTML analysis. Data stored in `~/.property_data/`. Friends can clone-and-run immediately.
 
 ### `/property`
-**完整工作流**（需要 Notion + Gmail 才能跑全套；任何缺失都自动降级）。
+**Full workflow** (needs Notion + Gmail for the full suite; gracefully degrades when anything's missing).
 
 ```bash
-/property                          # 默认：扫邮件 + 列待办（dry-run）
-/property --apply                  # 真执行：写沟通记录、更新看房时间等
+/property                          # default: scan emails + list todos (dry-run)
+/property --apply                  # actually write: comm entries, update viewing dates, etc.
 
-/property prep --addr <X> ...      # 单房看房简报
-/property prep --weekend           # 本周末所有看房
-/property review                   # 已看房源复盘 + gap 分析
-/property compare --addr A --addr B [...]  # 横向对比
+/property prep --addr <X> ...      # pre-viewing brief for one property
+/property prep --weekend           # all viewings this Sat+Sun
+/property review                   # post-viewing review + gap analysis
+/property compare --addr A --addr B [...]  # side-by-side comparison
 /property analyze <PDF>            # = /home-report
-/property emails --hours 72        # 仅跑 email intake
-/property health                   # 连通性检查
+/property emails --hours 72        # email intake only
+/property health                   # connectivity check
 ```
 
-也接受自然语言（"下周末看房" → `prep --weekend`，"复盘上周" → `review`），Claude 在 SKILL.md 里做意图识别。
+Also accepts natural language ("看房 next weekend" → `prep --weekend`, "review last week" → `review`); Claude interprets intent in the SKILL.md.
 
 ---
 
-## 架构
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -105,49 +107,7 @@ flowchart TD
   class html artefact
 ```
 
-<details>
-<summary>ASCII fallback（不支持 mermaid 的 markdown viewer）</summary>
-
-```
-                 ┌──────────────┐         ┌──────────────────┐
-   user ────────▶│ /property    │         │ /home-report PDF │  user (or friend)
-                 │  (SKILL.md)  │         │   (SKILL.md)     │
-                 └──────┬───────┘         └────────┬─────────┘
-                        │ subcommand parse +       │
-                        │ NL route                 │
-                        ▼                          │
-                ┌───────────────┐                  │
-                │ orchestrator/ │                  │
-                │   router.py   │                  │
-                └───────┬───────┘                  │
-       ┌────────┬───────┼────────┬──────────┐     │
-       ▼        ▼       ▼        ▼          ▼     ▼
-   intake   viewing  viewing  property   home_report
-            _prep    _review  _compare
-       │        │       │        │          │
-       └────────┴───┬───┴────────┴──────────┘
-                    ▼
-   ┌────────────┬─────────────┬──────────────┐
-   │  parsers/  │  analysis/  │   render/    │
-   │ parse_home │ scoring     │ renderer +   │
-   │ fetch_email│ surveyor_op │ Jinja2       │
-   │            │ viewing_str │ templates    │
-   │            │ comparison  │ (_base +     │
-   │            │             │  per-kind)   │
-   └────────────┴──────┬──────┴──────────────┘
-                       ▼
-                ┌──────────────┐
-                │   storage/   │  ← .env STORAGE_BACKEND 决定
-                │  base.py     │
-                ├──────────────┤
-                │ NotionStorage│ ← 用户自己
-                │ LocalJSON-   │ ← 朋友默认
-                │   Storage    │
-                └──────────────┘
-```
-</details>
-
-### Data flow: 单 PDF 一条线（`/home-report path.pdf`）
+### Data flow: single PDF (`/home-report path.pdf`)
 
 ```mermaid
 sequenceDiagram
@@ -173,105 +133,147 @@ sequenceDiagram
   Pipe-->>U: HTML path + summary
 ```
 
-[`docs/INSTALL.md`](docs/INSTALL.md) 有详细安装步骤；[`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) 是各集成（Notion / Gmail / Google Maps）的可选配置。
+See [`docs/INSTALL.md`](docs/INSTALL.md) for full install steps and [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) for optional Notion / Gmail / Google Maps setup.
 
 ---
 
-## 安装
+## Install
 
 ```bash
-git clone <repo-url> ~/.claude/property_assistant
+git clone https://github.com/isaaaaabella/edinburgh-property-assistant ~/.claude/property_assistant
 cd ~/.claude/property_assistant
 pip install -r requirements.txt
-cp .env.example .env       # 默认 STORAGE_BACKEND=local，无需任何 token
+cp .env.example .env                           # default STORAGE_BACKEND=local, no tokens needed
+cp preferences.example.json preferences.json   # edit top 5 fields with your preferences
 ```
 
-把两个 SKILL 软链到 Claude commands 目录：
+Symlink the two SKILLs to your Claude commands directory:
 ```bash
 mkdir -p ~/.claude/commands
 ln -s $(pwd)/skills/home-report.md ~/.claude/commands/home-report.md
 ln -s $(pwd)/skills/property.md    ~/.claude/commands/property.md
 ```
 
-然后在 Claude Code 里：
+Then in Claude Code:
 ```
 /home-report ~/Downloads/some_home_report.pdf
 ```
 
 ---
 
-## 关键概念
+## Using with other AI coding tools (Codex, Cursor, Cline, …)
 
-### `SurveyorOpinion` 强类型契约
-评估师意见不是自由文本，而是 6+1 段结构化数据：
+The Python core is vendor-neutral — anything that can run shell commands and call an LLM can use it. Only the `skills/*.md` files are Claude Code-specific slash command format.
 
-| 段 | 内容 | 强制 |
-|---|---|---|
-| ① 整体定位 | 一句话定性 | ✓ |
-| ② 评分校正 | 机械评分被冤枉的地方（cat_notes_contradictions 必须逐条点名） | 条件 |
-| ③ 真正的关注点 | ≤5 条最值得警惕 | — |
-| ④ 估值判断 | HR 估价 vs 市场对标 | ✓ |
-| ⑤ 出价方向 | 1-3 条建议 | ✓ |
-| ⑥ 看房当日 3 个最关键问题 | 1-5 条 | ✓ |
-| ⑦ 💭 评估师的额外思考 | 随手观察 / 历史经验 | 可选 |
+**Two paths**:
 
-每条 Finding 有 `kind` (fact / judgment / assumption) + `text` + 可选 `rationale` / `quote` / `evidence_page`。Validator 强制：
-- `cat_notes_contradictions` 全部要被 `score_corrections` 覆盖
-- `fact` 必须有 evidence_page
-- 整篇 judgment 类至少 3 条（防止纯事实堆砌）
-
-### HTML 三层卡片
-- 📋 客观事实（蓝） — PDF 里黑白纸字的东西
-- 🎓 评估师判断（绿） — 推断/建议
-- ⚠️ 假设与未知（黄） — 不全信息
-
-下面是详细 6 段视图、评分校正可视化（机械分 → 评估师调整后）、Cat 表、区域情报、HR 速览、嵌入式 Google Maps。
-
-### Storage 抽象
-- `NotionStorage` —— 直连你 Notion DB「房源追踪」，34 个字段（中文 property 名）自动映射
-- `LocalJSONStorage` —— 零配置，数据存 `~/.property_data/`（朋友默认）
-
-切换：`.env` 里改 `STORAGE_BACKEND=notion|local`。
-
----
-
-## 数据存哪里
-
-| Backend | 数据位置 | 报告位置 |
-|---|---|---|
-| `local` (默认) | `~/.property_data/properties/<slug>.json` | `~/.property_data/reports/<slug>/<timestamp>_<kind>.html` |
-| `notion` | Notion DB「房源追踪」(每行一套房) | `HTML报告` URL 字段（链 file:// 本地路径）+ 顶部 callout 摘要 |
-
----
-
-## 测试
+### Path A: hand the LLM work off, drive the CLI yourself (simplest, works with any tool)
 
 ```bash
-./run_tests.sh                          # 全套（含 storage 单测、validator 测、模板渲染测）
-NOTION_PARITY_TEST=1 ./run_tests.sh     # 加跑活 Notion round-trip（会创建 + 归档一个测试 page）
+# 1. Parse the PDF (deterministic, no LLM needed)
+python parse_home_report.py ~/x.pdf > /tmp/parsed.json
+
+# 2. Ask Codex / GPT-4 / Gemini / any LLM to read parsed.json
+#    + the prompt body of skills/home-report.md, then generate an
+#    opinion.json matching the schema:
+python -m property_assistant.analysis.surveyor_opinion schema
+
+# 3. Validate + run pipeline (deterministic, no LLM)
+python -m property_assistant.analysis.surveyor_opinion validate \
+  --parsed /tmp/parsed.json --opinion /tmp/opinion.json
+python -m property_assistant.pipelines.home_report run ~/x.pdf \
+  --opinion /tmp/opinion.json
 ```
 
-143+ 单测覆盖：PropertyRecord coercion、Notion field map、SurveyorOpinion validate、ViewingStrategy validate、PropertyRanking validate、模板渲染、router 子命令解析、pipeline 端到端。
+### Path B: port the SKILL.md to your tool's prompt format
+
+`skills/home-report.md` and `skills/property.md` use generic LLM prompting patterns (role definition / JSON schema / validate-retry loop). Copy them across, swap "you (Claude)" → "you (assistant)" etc., and they work. Codex CLI, Cursor, Continue.dev all have custom prompt mechanisms — check their docs for the exact format.
+
+**No AI at all also works**: drive the CLI directly (step 1 + 3 above) and write `opinion.json` by hand. The validator will tell you exactly which fields are missing.
 
 ---
 
-## 项目结构
+## Key concepts
+
+### `SurveyorOpinion` typed contract
+Surveyor opinion isn't free text — it's a 6+1 section structured object:
+
+| Section | Content | Required |
+|---|---|---|
+| ① 整体定位 / Overall positioning | One-line characterisation | ✓ |
+| ② 评分校正 / Score corrections | Where mechanical scoring got it wrong (all `cat_notes_contradictions` must be cited) | conditional |
+| ③ 真正的关注点 / Real concerns | ≤5 most serious issues | — |
+| ④ 估值判断 / Valuation judgment | HR value vs market comparables | ✓ |
+| ⑤ 出价方向 / Offer direction | 1-3 strategy lines | ✓ |
+| ⑥ 看房当日 3 个最关键问题 / Top 3 viewing-day questions | 1-5 items | ✓ |
+| ⑦ 💭 评估师的额外思考 / Additional thoughts | Stray observations, historical patterns | optional |
+
+Each Finding has `kind` (fact / judgment / assumption) + `text` + optional `rationale` / `quote` / `evidence_page`. The validator enforces:
+- All `cat_notes_contradictions` are covered by `score_corrections`
+- `fact`-kind findings must have an `evidence_page`
+- At least 3 `judgment`-kind findings overall (prevents pure fact-dumping)
+
+### HTML layered cards
+- 📋 **Objective facts** (blue) — what's literally in the PDF
+- 🎓 **Surveyor judgment** (green) — inferences and recommendations
+- ⚠️ **Assumptions & unknowns** (yellow) — incomplete information
+
+Below: detailed 6-section view, score correction visualisation (mechanical vs adjusted), Category 2/3 table, area intelligence, HR summary, embedded Google Maps.
+
+### Storage abstraction
+- `NotionStorage` — talks to your Notion DB "房源追踪" (Property Tracker); 34 fields with auto field-name mapping
+- `LocalJSONStorage` — zero-config, stores under `~/.property_data/` (friend default)
+
+Switch via `.env`: `STORAGE_BACKEND=notion|local`.
+
+---
+
+## Where data lives
+
+| Backend | Data location | Report location |
+|---|---|---|
+| `local` (default) | `~/.property_data/properties/<slug>.json` | `~/.property_data/reports/<slug>/<timestamp>_<kind>.html` |
+| `notion` | Notion DB "房源追踪" (one row per property) | `HTML报告` URL field (links to local `file://` path) + top-of-page callout summary |
+
+---
+
+## Tests
+
+```bash
+./run_tests.sh                          # full suite (storage, validators, template rendering)
+NOTION_PARITY_TEST=1 ./run_tests.sh     # also run live Notion round-trip (creates + archives a test page)
+```
+
+143+ unit tests cover: PropertyRecord coercion, Notion field map, SurveyorOpinion validate, ViewingStrategy validate, PropertyRanking validate, template rendering, router subcommand parsing, end-to-end pipeline runs.
+
+---
+
+## Project structure
 
 ```
 property_assistant/
-├── core/                  # PropertyRecord, CommEntry
-├── storage/               # NotionStorage + LocalJSONStorage + factory
-├── analysis/              # surveyor_opinion, viewing_strategy, scoring, comparison
-├── render/                # renderer.py + Jinja2 templates
-├── pipelines/             # home_report, viewing_prep, property_compare, intake, viewing_review
-├── orchestrator/          # router.py (precise subcommand parser)
-├── parse_home_report.py   # 确定性 PDF 解析器（被 pipeline 调用）
-├── fetch_emails.py        # Gmail IMAP fetcher（被 intake 调用）
-├── fetch_area_data.py     # postcodes.io + SIMD + Google Maps（可选）
-├── preferences.json       # 评分权重 + 你的偏好基线
-├── legacy/                # add_property.py / email_monitor.py（独立工具，不属于主流程）
-└── tests/                 # pytest 单测 (143+ tests)
+├── core/                     # PropertyRecord, CommEntry
+├── storage/                  # NotionStorage + LocalJSONStorage + factory
+├── analysis/                 # surveyor_opinion, viewing_strategy, scoring, comparison
+├── render/                   # renderer.py + Jinja2 templates
+├── pipelines/                # home_report, viewing_prep, property_compare, intake, viewing_review
+├── orchestrator/             # router.py (precise subcommand parser)
+├── skills/                   # /property + /home-report SKILL.md (symlinked to ~/.claude/commands/)
+├── parse_home_report.py      # deterministic PDF parser (called by pipelines)
+├── fetch_emails.py           # Gmail IMAP fetcher (called by intake)
+├── fetch_area_data.py        # postcodes.io + SIMD + Google Maps (optional)
+├── preferences.example.json  # scoring weights + preference template (cp to preferences.json and edit)
+├── legacy/                   # add_property.py / email_monitor.py (standalone tools, not in main flow)
+└── tests/                    # pytest suite (143+ tests)
 ```
+
+---
+
+## Acknowledgements
+
+Built by [@isaaaaabella](https://github.com/isaaaaabella) while house-hunting in Edinburgh's South Side. The Surveyor Opinion structure and the Scottish-housing-specific judgments were refined against real Home Reports from Marchmont, Tollcross, Newington, and Stockbridge listings (2025–2026).
+
+Co-authored with [Claude Code](https://www.anthropic.com/claude-code) Opus 4.7 (1M context).
 
 ---
 
