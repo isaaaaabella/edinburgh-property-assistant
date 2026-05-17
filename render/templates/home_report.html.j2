@@ -1,0 +1,85 @@
+{% import "_base.html.j2" as base %}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ record.address }} — Home Report 分析</title>
+{{ base.base_css() }}
+</head>
+<body>
+<div class="container">
+
+  {# ===== Header ===== #}
+  <header class="header">
+    <div class="address">{{ record.address }}</div>
+    {% if record.postcode %}<small>{{ record.postcode }}</small>{% endif %}
+    {{ base.score_badge(breakdown.total) }}
+    <div class="conclusion">{{ breakdown.recommendation }} · 总分 {{ breakdown.total }}/100</div>
+  </header>
+
+  {# ===== TL;DR pull-quote ===== #}
+  {{ base.tldr_box(opinion, tldr=tldr) }}
+
+  {# ===== Quick section navigation ===== #}
+  {{ base.section_nav() }}
+
+  {# ===== Location card (map + links) ===== #}
+  {{ base.location_card(record) }}
+
+  {# ===== ① 三层卡片：分层摘要 ===== #}
+  {{ base.layered_summary(opinion) }}
+
+  {# ===== ② 区域情报 ===== #}
+  {{ base.area_intelligence(record, area=area) }}
+
+  {# ===== ③ 关键数据网格 ===== #}
+  {{ base.meta_grid(record) }}
+
+  {# ===== ③ 评估师意见 6 段详情 ===== #}
+  {{ base.opinion_detail(opinion) }}
+
+  {# ===== ④ 评分详情 ===== #}
+  {{ base.score_breakdown(breakdown, opinion=opinion) }}
+
+  {# ===== ⑤ Condition 表（Cat 2/3 行） ===== #}
+  {% set cond_rows = parsed.condition_table or [] %}
+  {% if cond_rows %}
+    {% set has_concern = cond_rows | selectattr('cat', 'in', ['2','3']) | list %}
+    {% if has_concern %}
+      {{ base.condition_table(cond_rows) }}
+    {% endif %}
+  {% endif %}
+
+  {# ===== ⑥ 提取证据（可折叠） ===== #}
+  {% if parsed.regex_extracted %}
+  <details class="evidence">
+    <summary>📋 提取证据（解析器输出）</summary>
+    <table class="cat-table" style="margin-top:8px;">
+      <thead><tr><th>字段</th><th>值</th><th>p.</th></tr></thead>
+      <tbody>
+      {% for key, info in parsed.regex_extracted.items() %}
+        {% if info and info.value %}
+        <tr>
+          <td>{{ key }}</td>
+          <td>{{ info.value }}</td>
+          <td><small>{% if info.page %}p.{{ info.page }}{% endif %}</small></td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if parsed.warnings %}
+    <h4 style="margin-top:12px;">解析警告</h4>
+    <ul>{% for w in parsed.warnings %}<li><small>{{ w }}</small></li>{% endfor %}</ul>
+    {% endif %}
+  </details>
+  {% endif %}
+
+  <footer class="footer">
+    {{ generated_at }} · Scottish Property Assistant<br>
+    {% if storage_backend %}backend: {{ storage_backend }}{% endif %}
+  </footer>
+
+</div>
+</body>
+</html>

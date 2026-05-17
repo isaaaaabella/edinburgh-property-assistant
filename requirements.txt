@@ -1,0 +1,15 @@
+# Core (required)
+jinja2>=3.0
+markupsafe>=2.0
+
+# PDF parsing (required by parse_home_report.py)
+# pdftotext + pdfimages come from poppler — install via:
+#   macOS:   brew install poppler
+#   Ubuntu:  apt-get install poppler-utils
+Pillow>=9.0
+
+# Optional: HTTP for area_data lookups (postcodes.io / SIMD)
+# stdlib urllib is used; requests is not required
+
+# Dev / test
+pytest>=7.0

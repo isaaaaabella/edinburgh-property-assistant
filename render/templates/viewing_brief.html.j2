@@ -1,0 +1,145 @@
+{% import "_base.html.j2" as base %}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ record.address }} — 看房简报</title>
+{{ base.base_css() }}
+</head>
+<body>
+<div class="container">
+
+  {# ===== Header: address + viewing time + agent ===== #}
+  <header class="header">
+    <div class="address">{{ record.address }}</div>
+    {% if record.postcode %}<small>{{ record.postcode }}</small>{% endif %}
+    {% if viewing_meta and (viewing_meta.time or viewing_meta.agent) %}
+    <div class="viewing-meta">
+      {% if viewing_meta.time %}📅 {{ viewing_meta.time }}{% endif %}
+      {% if viewing_meta.agent %}{% if viewing_meta.time %} · {% endif %}🏢 {{ viewing_meta.agent }}{% endif %}
+    </div>
+    {% endif %}
+    {{ base.score_badge(breakdown.total) }}
+    <div class="conclusion">{{ breakdown.recommendation }} · 总分 {{ breakdown.total }}/100</div>
+  </header>
+
+  {# ===== TL;DR ===== #}
+  {% if opinion %}{{ base.tldr_box(opinion, tldr=tldr) }}{% endif %}
+
+  {# ===== Quick nav (viewing-specific) ===== #}
+  <nav class="section-nav">
+    <a href="#hr-summary">📄 HR</a>
+    <a href="#risks">⚠️ 风险</a>
+    <a href="#offer">💰 出价</a>
+    <a href="#qa">❓ 问答</a>
+    <a href="#checklist">✅ 清单</a>
+    <a href="#tactics">🗣️ 谈判</a>
+    <a href="#area">🗺️ 区域</a>
+    {% if opinion %}<a href="#layered">📋 三层</a>{% endif %}
+    <a href="#scoring">📊 评分</a>
+    <a href="#condition">🔎 Cat</a>
+  </nav>
+
+  {# ===== Location ===== #}
+  {{ base.location_card(record) }}
+
+  {# ===== 📄 HR 速览（让用户先看 PDF 给了什么） ===== #}
+  {{ base.hr_summary(record, parsed=parsed) }}
+
+  {# ===== 关键数据网格 ===== #}
+  {{ base.meta_grid(record) }}
+
+  {# ===== 区域情报 ===== #}
+  {{ base.area_intelligence(record, area=area) }}
+
+  {# ===== ⚠️ 进门前先记住 ===== #}
+  <section class="section" id="risks">
+    <h3>⚠️ 进门前先记住的 {{ strategy.headline_risks|length }} 件事</h3>
+    <ol>
+      {% for r in strategy.headline_risks %}
+        <li><strong>{{ r }}</strong></li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  {# ===== 💰 出价 3 档（提前突出，影响所有问答） ===== #}
+  <section class="section" id="offer">
+    <h3>💰 出价策略（3 档）</h3>
+    <div class="offer-tiers">
+      {% for tier in strategy.offer_tiers %}
+      <div class="offer-tier offer-{{ tier.label }}">
+        <div class="offer-label">{{ {'opening': '开价', 'target': '心理价', 'walk_away': '止损线'}[tier.label] }}</div>
+        <div class="offer-amount">£{{ '{:,.0f}'.format(tier.amount) }}</div>
+        <div class="offer-rationale">{{ tier.rationale }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# ===== ❓ 中介问答（中英双语） ===== #}
+  <section class="section" id="qa">
+    <h3>❓ 中介问答清单（中英双语 · 共 {{ strategy.bilingual_qa|length }} 条）</h3>
+    {% for qa in strategy.bilingual_qa %}
+    <div class="qa-item">
+      <div class="qa-cn">{{ loop.index }}. {{ qa.chinese }}</div>
+      <div class="qa-en">EN: {{ qa.english }}</div>
+      <div class="qa-why">💡 {{ qa.why }}</div>
+    </div>
+    {% endfor %}
+  </section>
+
+  {# ===== ✅ 看房清单（分类 + 勾选） ===== #}
+  <section class="section" id="checklist">
+    <h3>✅ 看房现场检查清单（共 {{ strategy.on_site_checklist|length }} 项）</h3>
+    {% set cat_labels = {
+      'structural': '🏗️ 房屋结构',
+      'comfort':    '🛋️ 居住舒适度',
+      'neighbours': '👥 邻居/环境',
+      'documents':  '📋 文件/产权'
+    } %}
+    {% for cat in ['structural', 'comfort', 'neighbours', 'documents'] %}
+      {% set items = strategy.on_site_checklist | selectattr('category', 'equalto', cat) | list %}
+      {% if items %}
+      <h4>{{ cat_labels[cat] }}</h4>
+      <ul class="checklist">
+        {% for item in items %}
+        <li><label><input type="checkbox"> <span>{{ item.text }}</span></label></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    {% endfor %}
+  </section>
+
+  {# ===== 🗣️ 沟通战术 ===== #}
+  <section class="section" id="tactics">
+    <h3>🗣️ 谈判与沟通策略</h3>
+    <ul>
+      {% for t in strategy.communication_tactics %}<li>{{ t }}</li>{% endfor %}
+    </ul>
+  </section>
+
+  {# ===== 评估师意见（layered + 详情，可选） ===== #}
+  {% if opinion %}
+    {{ base.layered_summary(opinion) }}
+    {{ base.opinion_detail(opinion) }}
+  {% endif %}
+
+  {# ===== 评分详情 ===== #}
+  {{ base.score_breakdown(breakdown, opinion=opinion) }}
+
+  {# ===== Cat 表 ===== #}
+  {% if parsed and parsed.condition_table %}
+    {% set has_concern = parsed.condition_table | selectattr('cat', 'in', ['2','3']) | list %}
+    {% if has_concern %}
+      {{ base.condition_table(parsed.condition_table) }}
+    {% endif %}
+  {% endif %}
+
+  <footer class="footer">
+    {{ generated_at }} · Scottish Property Assistant — 看房简报<br>
+    {% if storage_backend %}backend: {{ storage_backend }}{% endif %}
+  </footer>
+
+</div>
+</body>
+</html>

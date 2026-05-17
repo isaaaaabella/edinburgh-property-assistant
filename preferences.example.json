@@ -1,0 +1,83 @@
+{
+  "_comment": "买房偏好配置模板 — 复制为 preferences.json 然后编辑顶部 5 个字段（其他评分维度的默认值适用于多数 Edinburgh 买家，按需调）",
+
+  "_comment_user_fields": "下面是你自己的偏好 — 必须改",
+  "bedrooms_preferred": 2,
+  "floor_min": 1,
+  "gas_required": true,
+  "target_schools": ["Boroughmuir High School", "James Gillespie's High School"],
+
+  "_comment_commute": "通勤地写完整地址（postcode），label 显示在 HTML 报告里",
+  "commute": {
+    "user_label": "Me",
+    "user_workplace": "<your office address with postcode>",
+    "partner_label": "Partner",
+    "partner_workplace": "<partner office address with postcode>",
+    "user_max_min": 35,
+    "partner_max_min": 50,
+    "departure_weekday_8_30_unix": 1745913000
+  },
+
+  "_comment_weights": "下面是评分权重和阈值 — Edinburgh 通用默认，按需调",
+  "score_weights": {
+    "value":         25,
+    "building_type": 20,
+    "floor":         10,
+    "gas":           15,
+    "school":        20,
+    "condition":     10,
+    "bonus":          5
+  },
+
+  "_comment_value": "value 维度：按 挂牌价(£) ÷ 面积(m²) 计算性价比，Edinburgh 南区基准",
+  "value_scores": {
+    "excellent":      { "max_gbp_per_sqm": 3500, "score": 25 },
+    "good":           { "min_gbp_per_sqm": 3500, "max_gbp_per_sqm": 4500, "score": 19 },
+    "fair":           { "min_gbp_per_sqm": 4500, "max_gbp_per_sqm": 5500, "score": 12 },
+    "expensive":      { "min_gbp_per_sqm": 5500, "score": 5 },
+    "_comment_bonus": "在 value 得分基础上叠加卧室小加分（最终不超过满分25）",
+    "bedroom_bonus":  { "2": 3, "3": 1, "default": 0 }
+  },
+
+  "_comment_floor": "倾向 Ground 主门公寓和1楼；非主门地面层不惩罚到0",
+  "floor_scores": {
+    "ground_main_door": 9,
+    "ground_standard":  4,
+    "first":           10,
+    "second":           9,
+    "third":            7,
+    "top":              5
+  },
+
+  "building_type_scores": {
+    "traditional_tenement_pre1919": 20,
+    "tenement_other":               12,
+    "purpose_built_flat":            5,
+    "other":                         0
+  },
+
+  "_comment_schools": "把你 target_schools 列表里的学校加到这里给高分；其它的归到 other_south_side / other_edinburgh / unknown",
+  "school_scores": {
+    "Boroughmuir High School":        20,
+    "James Gillespie's High School":  18,
+    "other_south_side":               12,
+    "other_edinburgh":                 6,
+    "unknown":                         8
+  },
+
+  "condition_scores": {
+    "cat3_0_cat2_lte2":   10,
+    "cat3_0_cat2_3to5":    7,
+    "cat3_0_cat2_6plus":   4,
+    "cat3_1":              2,
+    "cat3_2plus":          0,
+    "roof_penalty":       -8,
+    "minimum":            -8
+  },
+
+  "bonus_scores": {
+    "epc_B_or_above":  3,
+    "epc_C":           1,
+    "pre_1919":        2
+  }
+}

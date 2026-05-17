@@ -1,0 +1,123 @@
+{% import "_base.html.j2" as base %}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>房源对比 ({{ comparison.properties|length }} 套)</title>
+{{ base.base_css() }}
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <div class="address">📊 房源横向对比</div>
+    <small>{{ comparison.properties|length }} 套 · 自动评分 + 机械对比{% if ranking %} + 评估师排名{% endif %}</small>
+  </header>
+
+  {# ===== AI 排名 (可选, opinion-style) ===== #}
+  {% if ranking %}
+  <section class="section" id="ranking">
+    <h3>🏆 评估师推荐排名</h3>
+    <div class="ranking-cards">
+      {% for r in ranking.ranked|sort(attribute='rank') %}
+      <div class="rank-card rank-{{ r.rank if r.rank <= 3 else 'other' }}">
+        <div class="rank-badge">{{ r.rank }}</div>
+        <div class="rank-body">
+          <div class="rank-address">{{ r.address }}</div>
+          <div class="rank-line">{{ r.one_line }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="bottom-line">
+      <strong>综合判断：</strong>{{ ranking.bottom_line }}
+    </div>
+  </section>
+
+  {% if ranking.additional_thoughts %}
+  <section class="section additional-thoughts" id="ranking-extra">
+    <h3>💭 评估师的额外思考</h3>
+    <p style="font-size:12px;color:#718096;margin-bottom:8px;">
+      跨房源的随手观察、市场判断、不归到 ranking 里的边角洞察。
+    </p>
+    {% for f in ranking.additional_thoughts %}
+      <div class="finding-row">
+        <span class="kind-chip {{ f.kind }}">{{ {'fact':'事实','judgment':'判断','assumption':'假设'}[f.kind] }}</span>
+        <span class="finding-body">
+          <span class="headline">{{ f.text }}</span>
+          {% if f.evidence_page %}<span class="page-ref">p.{{ f.evidence_page }}</span>{% endif %}
+          {% if f.rationale %}<span class="rationale">{{ f.rationale | highlight_metrics }}</span>{% endif %}
+          {% if f.quote %}<span class="pdf-quote">{{ f.quote }}</span>{% endif %}
+        </span>
+      </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% endif %}
+
+  {# ===== 机械对比表 ===== #}
+  <section class="section" id="table">
+    <h3>📐 维度对比表</h3>
+    <p style="font-size:12px;color:#718096;margin-bottom:8px;">
+      绿色 ✨ 标记是在该维度上数据最优的房子。横向滑动查看全部。
+    </p>
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th></th>
+            {% for p in comparison.properties %}
+              <th>{{ p.address.split(',')[0] }}{% if p.postcode %}<br><small style="font-weight:400;color:#a0aec0;">{{ p.postcode }}</small>{% endif %}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in comparison.rows %}
+          <tr>
+            <th>
+              {{ row.label }}
+              {% if row.note %}<span class="row-note">{{ row.note }}</span>{% endif %}
+            </th>
+            {% for v in row.values %}
+              <td{% if loop.index0 == row.winner_idx %} class="winner"{% endif %}>{{ v }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ===== 每个房子简要 score breakdown ===== #}
+  <section class="section" id="per-property">
+    <h3>📊 各房源分项评分</h3>
+    {% for p in comparison.properties %}
+    <details{% if loop.first %} open{% endif %} style="margin-bottom:8px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:14px;padding:8px 0;">
+        {{ p.address.split(',')[0] }} — {{ comparison.breakdowns[loop.index0].total }}/100 · {{ comparison.breakdowns[loop.index0].recommendation }}
+      </summary>
+      <div style="padding:0 4px;">
+        {% for d in comparison.breakdowns[loop.index0].dimensions %}
+          {% set pct = (d.score / d.max_score * 100) if d.max_score else 0 %}
+          <div class="score-row">
+            <div class="label">{{ d.name }} — {{ '%g'|format(d.score) }} / {{ '%g'|format(d.max_score) }}</div>
+            <div class="score-bar">
+              <div class="score-bar-fill {% if pct >= 90 %}full{% elif pct < 30 %}low{% endif %}"
+                   style="width: {{ pct|int|abs }}%"></div>
+            </div>
+            <div class="detail">{{ d.detail }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endfor %}
+  </section>
+
+  <footer class="footer">
+    {{ generated_at }} · Scottish Property Assistant — 横向对比<br>
+    {% if storage_backend %}backend: {{ storage_backend }}{% endif %}
+  </footer>
+
+</div>
+</body>
+</html>

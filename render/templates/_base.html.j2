@@ -1,0 +1,830 @@
+{# _base.html.j2 — shared CSS + macros for all property HTML reports.
+   Imported by home_report / viewing_brief / property_compare templates.
+
+   Layered cards design (per design decision 2026-05-16):
+   - Top: three independent coloured cards (Facts / Judgment / Assumptions)
+   - Below: detailed 6-section surveyor opinion view
+   - Then: scoring / Cat tables / viewing questions / evidence
+
+   Mobile-first 480px max-width. Self-contained inline CSS (no external assets,
+   so an HTML file is fully portable — friend can email or open offline).
+#}
+
+{% macro base_css() %}
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f5f7fa;
+    color: #1a202c;
+    line-height: 1.55;
+  }
+  .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  h1, h2, h3, h4 { margin: 0 0 8px; }
+  h1 { font-size: 22px; }
+  h2 { font-size: 18px; color: #2d3748; margin-top: 24px; }
+  h3 { font-size: 16px; }
+  h4 { font-size: 14px; color: #4a5568; }
+  p, li { font-size: 14px; }
+  ul { padding-left: 18px; margin: 6px 0; }
+  li { margin: 4px 0; }
+  small { color: #718096; }
+
+  /* ===== Header ===== */
+  .header {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .header .address { font-size: 16px; font-weight: 600; }
+  .header .score-badge {
+    display: inline-block;
+    width: 84px; height: 84px;
+    line-height: 84px;
+    border-radius: 50%;
+    font-size: 30px; font-weight: 700;
+    color: #fff;
+    margin: 12px 0 8px;
+  }
+  .score-badge.s-high { background: linear-gradient(135deg, #38a169 0%, #2f855a 100%); }
+  .score-badge.s-mid  { background: linear-gradient(135deg, #d69e2e 0%, #b7791f 100%); }
+  .score-badge.s-low  { background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%); }
+  .header .conclusion { font-size: 14px; color: #4a5568; margin-top: 4px; }
+
+  /* ===== Layered cards (the 3 top cards) ===== */
+  .layer-cards { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+  .card {
+    border-radius: 10px;
+    padding: 12px 14px 12px 18px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    border-left: 4px solid;
+    background: #fff;
+  }
+  .card h3 { font-size: 15px; margin-bottom: 8px; }
+  .card ul { padding-left: 16px; }
+  .card li { font-size: 13.5px; line-height: 1.5; }
+
+  .card-fact       { background: #e8f0f7; border-left-color: #2c5282; }
+  .card-fact h3    { color: #2c5282; }
+  .card-judgment   { background: #e8f5e8; border-left-color: #2f7d2f; }
+  .card-judgment h3{ color: #2f7d2f; }
+  .card-assumption { background: #fff8e1; border-left-color: #b8860b; }
+  .card-assumption h3 { color: #b8860b; }
+
+  .page-ref {
+    font-size: 11px; color: #718096; margin-left: 4px;
+    background: #fff; padding: 1px 5px; border-radius: 3px;
+  }
+  .score-delta {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    background: #fff; color: #2f7d2f; padding: 1px 6px;
+    border: 1px solid #c6f6c6; border-radius: 10px; margin-left: 6px;
+  }
+  .score-delta.neg { color: #c53030; border-color: #fed7d7; }
+  .contradiction-ref {
+    display: inline-block; font-size: 10.5px;
+    background: #fef5e7; color: #b7791f;
+    padding: 1px 6px; border-radius: 10px; margin-left: 6px;
+    border: 1px solid #fbd38d;
+  }
+
+  /* ===== Detailed sections ===== */
+  .section {
+    background: #fff; border-radius: 10px; padding: 14px;
+    margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .section h3 {
+    color: #2d3748; font-size: 15px;
+    border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 10px;
+  }
+  .finding-row {
+    display: flex; align-items: flex-start; gap: 6px;
+    margin: 6px 0; font-size: 13.5px; line-height: 1.5;
+  }
+  .finding-row .kind-chip {
+    flex: 0 0 auto;
+    font-size: 10.5px; font-weight: 600;
+    padding: 1px 6px; border-radius: 8px;
+    min-width: 28px; text-align: center;
+  }
+  .kind-chip.fact       { background: #e8f0f7; color: #2c5282; }
+  .kind-chip.judgment   { background: #e8f5e8; color: #2f7d2f; }
+  .kind-chip.assumption { background: #fff8e1; color: #b8860b; }
+
+  .finding-body { display: block; }
+  .finding-body .headline { font-weight: 600; color: #2d3748; }
+  .finding-body .rationale {
+    display: block; font-size: 12.5px; color: #4a5568;
+    margin-top: 4px; line-height: 1.55;
+    padding-left: 8px; border-left: 2px solid #e2e8f0;
+  }
+  .finding-body .pdf-quote {
+    display: block; font-size: 12px; color: #4a5568;
+    margin-top: 6px; padding: 6px 10px;
+    background: #f7fafc; border-left: 3px solid #cbd5e0;
+    border-radius: 4px; font-style: italic;
+  }
+  .finding-body .pdf-quote::before { content: "“"; }
+  .finding-body .pdf-quote::after  { content: "”"; }
+
+  /* ===== Score detail bars ===== */
+  .score-bar {
+    background: #edf2f7; height: 18px; border-radius: 9px;
+    overflow: hidden; margin: 4px 0;
+  }
+  .score-bar-fill { height: 100%; background: linear-gradient(90deg, #4299e1, #3182ce); }
+  .score-bar-fill.full { background: linear-gradient(90deg, #48bb78, #38a169); }
+  .score-bar-fill.low  { background: linear-gradient(90deg, #f56565, #e53e3e); }
+  .score-row { font-size: 13px; margin: 8px 0; }
+  .score-row .label { font-weight: 600; }
+  .score-row .detail { font-size: 12px; color: #718096; margin-top: 2px; }
+
+  /* ===== Cat table ===== */
+  .cat-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cat-table th, .cat-table td {
+    padding: 6px 8px; text-align: left; border-bottom: 1px solid #e2e8f0;
+  }
+  .cat-table th { background: #f7fafc; font-weight: 600; }
+  .cat-pill {
+    display: inline-block; font-weight: 600; font-size: 11px;
+    padding: 1px 7px; border-radius: 10px;
+  }
+  .cat-pill.cat1 { background: #f0fff4; color: #2f855a; }
+  .cat-pill.cat2 { background: #fef5e7; color: #b7791f; }
+  .cat-pill.cat3 { background: #fed7d7; color: #c53030; }
+
+  /* ===== Misc ===== */
+  details.evidence {
+    background: #fff; border-radius: 10px; padding: 12px;
+    margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  details.evidence summary {
+    cursor: pointer; font-weight: 600; color: #4a5568;
+  }
+  .footer {
+    margin-top: 24px; text-align: center; color: #a0aec0; font-size: 12px;
+  }
+  .meta-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    background: #fff; border-radius: 10px; padding: 12px;
+    margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .meta-grid .cell {
+    background: #f7fafc; padding: 8px; border-radius: 6px;
+  }
+  .meta-grid .cell .label { font-size: 11px; color: #718096; }
+  .meta-grid .cell .value { font-size: 14px; font-weight: 600; color: #2d3748; }
+
+  /* ===== Location section (map + links) ===== */
+  .location-card {
+    background: #fff; border-radius: 10px; overflow: hidden;
+    margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .location-card iframe {
+    width: 100%; height: 180px; border: 0;
+    display: block; background: #edf2f7;
+  }
+  .link-chips {
+    display: flex; gap: 8px; padding: 10px;
+    flex-wrap: wrap;
+  }
+  .link-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12.5px; font-weight: 500;
+    padding: 6px 12px; border-radius: 18px;
+    text-decoration: none;
+    background: #f7fafc; color: #2d3748;
+    border: 1px solid #e2e8f0;
+    transition: background 0.15s;
+  }
+  .link-chip:hover { background: #edf2f7; }
+  .link-chip.primary { background: #2c5282; color: #fff; border-color: #2c5282; }
+  .link-chip.primary:hover { background: #2a4a78; }
+  .link-chip.warn { background: #fef5e7; color: #b7791f; border-color: #fbd38d; }
+
+  /* ===== TL;DR pull-quote ===== */
+  .tldr {
+    background: #fffbeb; border-radius: 10px;
+    border-left: 4px solid #d97706;
+    padding: 12px 14px; margin-bottom: 16px;
+    font-size: 14px; line-height: 1.6; color: #78350f;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .tldr .tldr-label {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    background: #d97706; color: #fff;
+    padding: 1px 8px; border-radius: 10px;
+    margin-right: 6px; vertical-align: middle;
+  }
+
+  /* ===== Section nav pills ===== */
+  .section-nav {
+    display: flex; gap: 6px; padding: 10px 0;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    margin-bottom: 12px;
+    scrollbar-width: none;
+  }
+  .section-nav::-webkit-scrollbar { display: none; }
+  .section-nav a {
+    flex: 0 0 auto;
+    font-size: 12px; font-weight: 500;
+    padding: 5px 11px; border-radius: 14px;
+    text-decoration: none;
+    background: #fff; color: #4a5568;
+    border: 1px solid #e2e8f0;
+    white-space: nowrap;
+  }
+  .section-nav a:hover { background: #edf2f7; }
+
+  /* Anchor offset for sticky-aware in-page jumps */
+  .section, .layer-cards, .meta-grid, .location-card {
+    scroll-margin-top: 12px;
+  }
+
+  /* ===== Metric highlights (inside rationale prose) ===== */
+  .hi-money {
+    background: #ebf8ff; color: #2c5282;
+    padding: 0 4px; border-radius: 3px;
+    font-weight: 600;
+  }
+  .hi-pct {
+    background: #f0fff4; color: #2f7d2f;
+    padding: 0 4px; border-radius: 3px;
+    font-weight: 600;
+  }
+  .hi-page {
+    background: #f7fafc; color: #4a5568;
+    padding: 0 4px; border-radius: 3px;
+    font-size: 11px; font-weight: 500;
+    text-decoration: none;
+  }
+
+  /* ===== Score correction visual ===== */
+  .score-corrected {
+    display: inline-block; font-size: 11.5px; font-weight: 600;
+    color: #2f7d2f; margin-left: 6px;
+  }
+  .score-corrected .arrow { color: #a0aec0; margin: 0 2px; }
+  .total-corrected {
+    background: #f0fff4; color: #2f7d2f;
+    padding: 2px 8px; border-radius: 12px;
+    font-size: 13px; font-weight: 600;
+    margin-left: 8px;
+  }
+
+  /* ===== Viewing brief: Q&A items ===== */
+  .qa-item {
+    border-left: 3px solid #cbd5e0;
+    padding: 8px 12px; margin: 10px 0;
+    background: #f7fafc; border-radius: 4px;
+  }
+  .qa-item .qa-cn { font-size: 14px; font-weight: 600; color: #1a202c; }
+  .qa-item .qa-en { font-size: 12.5px; color: #4a5568; margin-top: 3px; font-style: italic; }
+  .qa-item .qa-why {
+    font-size: 11.5px; color: #2c5282; margin-top: 6px;
+    padding-top: 4px; border-top: 1px dashed #cbd5e0;
+  }
+
+  /* ===== Viewing brief: 3-tier offer cards ===== */
+  .offer-tiers { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+  .offer-tier {
+    border-radius: 8px; padding: 10px 14px;
+    border-left: 4px solid;
+    display: grid; grid-template-columns: 70px 110px 1fr;
+    gap: 10px; align-items: center;
+    font-size: 13px;
+  }
+  .offer-tier.offer-opening   { background: #f0fff4; border-left-color: #38a169; }
+  .offer-tier.offer-target    { background: #ebf8ff; border-left-color: #2c5282; }
+  .offer-tier.offer-walk_away { background: #fff5f5; border-left-color: #c53030; }
+  .offer-label { font-weight: 700; font-size: 13px; }
+  .offer-amount { font-weight: 700; font-size: 16px; font-family: monospace; }
+  .offer-rationale { font-size: 12px; color: #4a5568; line-height: 1.4; }
+
+  /* ===== Viewing brief: checklist ===== */
+  .checklist { padding-left: 4px; list-style: none; }
+  .checklist li { margin: 5px 0; font-size: 13px; line-height: 1.5; }
+  .checklist label { cursor: pointer; display: flex; align-items: flex-start; gap: 6px; }
+  .checklist input[type="checkbox"] {
+    flex: 0 0 auto; margin-top: 3px; cursor: pointer;
+  }
+  .checklist input[type="checkbox"]:checked + span { text-decoration: line-through; color: #a0aec0; }
+
+  /* ===== Comparison table ===== */
+  .compare-table-wrap {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    background: #fff; border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    margin-bottom: 12px;
+  }
+  .compare-table-wrap::-webkit-scrollbar { height: 6px; }
+  .compare-table-wrap::-webkit-scrollbar-thumb {
+    background: #cbd5e0; border-radius: 3px;
+  }
+  .compare-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    min-width: 100%;
+  }
+  .compare-table th, .compare-table td {
+    padding: 8px 10px; border-bottom: 1px solid #edf2f7;
+    text-align: left; white-space: nowrap;
+    vertical-align: middle;
+  }
+  .compare-table thead th {
+    background: #f7fafc; color: #2d3748; font-weight: 600;
+    position: sticky; top: 0;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .compare-table tbody th {
+    background: #f7fafc; color: #4a5568;
+    font-weight: 600; font-size: 12px;
+    width: 110px; position: sticky; left: 0;
+    border-right: 1px solid #e2e8f0;
+  }
+  .compare-table td.winner {
+    background: #f0fff4; color: #2f7d2f;
+    font-weight: 600; position: relative;
+  }
+  .compare-table td.winner::after {
+    content: "✨"; margin-left: 4px; font-size: 10px;
+  }
+  .compare-table .row-note {
+    font-size: 10px; color: #a0aec0; font-weight: 400;
+    display: block;
+  }
+
+  /* ===== Ranking cards (LLM-driven) ===== */
+  .ranking-cards { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+  .rank-card {
+    border-radius: 10px; padding: 12px 14px;
+    border-left: 5px solid;
+    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    display: grid; grid-template-columns: 36px 1fr;
+    gap: 12px; align-items: center;
+  }
+  .rank-badge {
+    width: 32px; height: 32px; border-radius: 50%;
+    color: #fff; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rank-card.rank-1 { border-left-color: #38a169; }
+  .rank-card.rank-1 .rank-badge { background: #38a169; }
+  .rank-card.rank-2 { border-left-color: #2c5282; }
+  .rank-card.rank-2 .rank-badge { background: #2c5282; }
+  .rank-card.rank-3 { border-left-color: #d69e2e; }
+  .rank-card.rank-3 .rank-badge { background: #d69e2e; }
+  .rank-card.rank-other { border-left-color: #a0aec0; }
+  .rank-card.rank-other .rank-badge { background: #a0aec0; }
+  .rank-body .rank-address { font-size: 13.5px; font-weight: 600; color: #2d3748; }
+  .rank-body .rank-line { font-size: 12.5px; color: #4a5568; margin-top: 2px; }
+  .bottom-line {
+    margin-top: 12px; padding: 12px 14px;
+    background: #ebf8ff; border-left: 4px solid #2c5282;
+    border-radius: 6px; font-size: 13.5px; line-height: 1.55;
+    color: #2c5282;
+  }
+  .bottom-line strong { color: #1a365d; }
+
+  /* ===== Viewing meta (date/agent under address) ===== */
+  .viewing-meta {
+    font-size: 13px; color: #4a5568;
+    margin-top: 4px; padding: 4px 0;
+  }
+
+  /* ===== Print stylesheet ===== */
+  @media print {
+    body { background: #fff; }
+    .container { max-width: 100%; padding: 0; }
+    .location-card iframe, .section-nav, .link-chips { display: none !important; }
+    .card, .section, .meta-grid, .location-card, .header, .tldr, details.evidence {
+      box-shadow: none !important;
+      page-break-inside: avoid;
+    }
+    .header { background: #fff !important; }
+    details.evidence[open] summary { font-weight: 600; }
+    details.evidence { border: 1px solid #e2e8f0; }
+    a { color: inherit; text-decoration: none; }
+    .footer { color: #a0aec0; }
+    /* Checklist checkboxes still visible for marking */
+    .checklist input[type="checkbox"] { -webkit-print-color-adjust: exact; }
+  }
+</style>
+{% endmacro %}
+
+
+{# === Layered three-card summary === #}
+{% macro layered_summary(opinion) %}
+<div class="layer-cards" id="layered">
+  <article class="card card-fact">
+    <h3>📋 客观事实</h3>
+    {% set facts = opinion.all_findings_by_kind('fact') %}
+    {% if facts %}
+      <ul>{% for f in facts %}
+        <li>{{ f.text }}{% if f.evidence_page %}<span class="page-ref">p.{{ f.evidence_page }}</span>{% endif %}</li>
+      {% endfor %}</ul>
+    {% else %}
+      <p><small>无独立事实条目（详见下方 6 段视图）</small></p>
+    {% endif %}
+  </article>
+
+  <article class="card card-judgment">
+    <h3>🎓 评估师判断</h3>
+    {% set judgments = opinion.all_findings_by_kind('judgment') %}
+    {% if judgments %}
+      <ul>{% for f in judgments %}
+        <li><strong>{{ f.text }}</strong>
+          {% if f.score_delta is not none %}
+            <span class="score-delta{% if f.score_delta < 0 %} neg{% endif %}">{{ '%+.1f'|format(f.score_delta) }}</span>
+          {% endif %}
+          {% if f.contradiction_id %}<span class="contradiction-ref">⚡ 矛盾</span>{% endif %}
+          {% if f.rationale %}<br><span style="font-size:12.5px;color:#4a5568;line-height:1.5;">{{ f.rationale }}</span>{% endif %}
+        </li>
+      {% endfor %}</ul>
+    {% else %}
+      <p><small>无评估师判断条目</small></p>
+    {% endif %}
+  </article>
+
+  <article class="card card-assumption">
+    <h3>⚠️ 假设与未知</h3>
+    {% set assumptions = opinion.all_findings_by_kind('assumption') %}
+    {% if assumptions %}
+      <ul>{% for f in assumptions %}<li>{{ f.text }}</li>{% endfor %}</ul>
+    {% else %}
+      <p><small>无标注的假设</small></p>
+    {% endif %}
+  </article>
+</div>
+{% endmacro %}
+
+
+{# === One detailed section with kind chips inline === #}
+{% macro detailed_section(title, findings, anchor=None) %}
+{% if findings %}
+<section class="section"{% if anchor %} id="{{ anchor }}"{% endif %}>
+  <h3>{{ title }}</h3>
+  {% for f in findings %}
+    <div class="finding-row">
+      <span class="kind-chip {{ f.kind }}">{{ {'fact':'事实','judgment':'判断','assumption':'假设'}[f.kind] }}</span>
+      <span class="finding-body">
+        <span class="headline">{{ f.text }}</span>
+        {% if f.evidence_page %}<span class="page-ref">p.{{ f.evidence_page }}</span>{% endif %}
+        {% if f.score_delta is not none %}
+          <span class="score-delta{% if f.score_delta < 0 %} neg{% endif %}">{{ '%+.1f'|format(f.score_delta) }}</span>
+        {% endif %}
+        {% if f.contradiction_id %}<span class="contradiction-ref">⚡ {{ f.contradiction_id }}</span>{% endif %}
+        {% if f.rationale %}<span class="rationale">{{ f.rationale | highlight_metrics }}</span>{% endif %}
+        {% if f.quote %}<span class="pdf-quote">{{ f.quote }}{% if f.evidence_page %} <small style="opacity:0.7;">— p.{{ f.evidence_page }}</small>{% endif %}</span>{% endif %}
+      </span>
+    </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% endmacro %}
+
+
+{# === Six-section detail panel for the surveyor opinion === #}
+{% macro opinion_detail(opinion) %}
+{{ detailed_section('① 整体定位', opinion.overall_positioning, anchor='opinion-1') }}
+{{ detailed_section('② 评分校正', opinion.score_corrections, anchor='opinion-2') }}
+{{ detailed_section('③ 真正的关注点', opinion.real_concerns, anchor='opinion-3') }}
+{{ detailed_section('④ 估值判断', opinion.valuation_judgment, anchor='opinion-4') }}
+{{ detailed_section('⑤ 出价方向', opinion.offer_direction, anchor='opinion-5') }}
+{{ detailed_section('⑥ 看房当日 3 个最关键问题', opinion.viewing_priorities, anchor='opinion-6') }}
+{% if opinion.additional_thoughts %}
+<section class="section additional-thoughts" id="opinion-extra">
+  <h3>💭 评估师的额外思考</h3>
+  <p style="font-size:12px;color:#718096;margin-bottom:8px;">
+    不归到上面 6 段里的随手观察、历史经验、边角洞察。语气更松散，但都基于具体证据。
+  </p>
+  {% for f in opinion.additional_thoughts %}
+    <div class="finding-row">
+      <span class="kind-chip {{ f.kind }}">{{ {'fact':'事实','judgment':'判断','assumption':'假设'}[f.kind] }}</span>
+      <span class="finding-body">
+        <span class="headline">{{ f.text }}</span>
+        {% if f.evidence_page %}<span class="page-ref">p.{{ f.evidence_page }}</span>{% endif %}
+        {% if f.rationale %}<span class="rationale">{{ f.rationale | highlight_metrics }}</span>{% endif %}
+        {% if f.quote %}<span class="pdf-quote">{{ f.quote }}{% if f.evidence_page %} <small style="opacity:0.7;">— p.{{ f.evidence_page }}</small>{% endif %}</span>{% endif %}
+      </span>
+    </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% endmacro %}
+
+
+{# === TL;DR pull-quote: one-sentence verdict at top === #}
+{% macro tldr_box(opinion, tldr=None) %}
+{# Use explicit `tldr` if passed; else derive from offer_direction[0] + overall_positioning[0]. #}
+{% set summary = tldr %}
+{% if not summary %}
+  {% set pos = opinion.overall_positioning[0].text if opinion.overall_positioning else '' %}
+  {% set off = opinion.offer_direction[0].text if opinion.offer_direction else '' %}
+  {% if pos and off %}{% set summary = pos ~ '。' ~ off %}{% elif pos %}{% set summary = pos %}{% elif off %}{% set summary = off %}{% endif %}
+{% endif %}
+{% if summary %}
+<div class="tldr">
+  <span class="tldr-label">TL;DR</span>{{ summary }}
+</div>
+{% endif %}
+{% endmacro %}
+
+
+{# === Section navigation pills === #}
+{% macro section_nav() %}
+<nav class="section-nav">
+  <a href="#layered">📋 三层</a>
+  <a href="#area">🗺️ 区域</a>
+  <a href="#opinion-1">① 定位</a>
+  <a href="#opinion-2">② 校正</a>
+  <a href="#opinion-3">③ 关注点</a>
+  <a href="#opinion-4">④ 估值</a>
+  <a href="#opinion-5">⑤ 出价</a>
+  <a href="#opinion-6">⑥ 看房</a>
+  <a href="#scoring">📊 评分</a>
+  <a href="#condition">🔎 Cat</a>
+</nav>
+{% endmacro %}
+
+
+{# === Compact data grid: HR fields at a glance === #}
+{% macro meta_grid(record) %}
+<section class="meta-grid">
+  {% if record.hr_valuation %}
+  <div class="cell">
+    <div class="label">HR 估价</div>
+    <div class="value">£{{ '{:,.0f}'.format(record.hr_valuation) }}</div>
+  </div>
+  {% endif %}
+  {% if record.asking_price %}
+  <div class="cell">
+    <div class="label">挂牌价</div>
+    <div class="value">£{{ '{:,.0f}'.format(record.asking_price) }}</div>
+  </div>
+  {% endif %}
+  {% if record.bedrooms %}
+  <div class="cell">
+    <div class="label">卧室</div>
+    <div class="value">{{ record.bedrooms }}</div>
+  </div>
+  {% endif %}
+  {% if record.floor_area %}
+  <div class="cell">
+    <div class="label">面积</div>
+    <div class="value">{{ record.floor_area }} m²</div>
+  </div>
+  {% endif %}
+  {% if record.floor %}
+  <div class="cell">
+    <div class="label">楼层</div>
+    <div class="value">{{ record.floor }}</div>
+  </div>
+  {% endif %}
+  {% if record.epc_rating %}
+  <div class="cell">
+    <div class="label">EPC</div>
+    <div class="value">{{ record.epc_rating }}{% if record.epc_score %} ({{ record.epc_score }}){% endif %}</div>
+  </div>
+  {% endif %}
+  {% if record.building_type %}
+  <div class="cell">
+    <div class="label">类型</div>
+    <div class="value">{{ record.building_type }}</div>
+  </div>
+  {% endif %}
+  {% if record.era %}
+  <div class="cell">
+    <div class="label">建造年代</div>
+    <div class="value">{{ record.era }}</div>
+  </div>
+  {% endif %}
+  {% if record.cat2_count is not none or record.cat3_count is not none %}
+  <div class="cell">
+    <div class="label">Cat 2/3</div>
+    <div class="value">
+      {% if record.cat3_count %}<span style="color:#c53030">{{ record.cat3_count }} Cat 3</span>{% else %}0 Cat 3{% endif %}
+      / {{ record.cat2_count or 0 }} Cat 2
+    </div>
+  </div>
+  {% endif %}
+  {% if record.factor_status %}
+  <div class="cell">
+    <div class="label">Factor</div>
+    <div class="value">{{ record.factor_status }}{% if record.factor_monthly %} · £{{ record.factor_monthly }}/月{% endif %}</div>
+  </div>
+  {% endif %}
+</section>
+{% endmacro %}
+
+
+{# === Area intelligence: SIMD / flood / commute / schools === #}
+{% macro area_intelligence(record, area=None) %}
+{% if area or record.school_zone %}
+<section class="section" id="area">
+  <h3>🗺️ 区域情报</h3>
+  {% if area and area.simd %}
+    <div class="score-row">
+      <div class="label">SIMD 综合分位 — <strong>{{ area.simd.decile }}/10</strong></div>
+      <div class="score-bar">
+        <div class="score-bar-fill {% if area.simd.decile >= 8 %}full{% elif area.simd.decile < 5 %}low{% endif %}"
+             style="width: {{ area.simd.decile * 10 }}%"></div>
+      </div>
+      <div class="detail">10 = 最富裕；爱丁堡南区典型 8-10</div>
+    </div>
+  {% endif %}
+  {% if area and area.flood %}
+    <p style="margin-top:8px;"><strong>洪水风险：</strong>{{ area.flood }}</p>
+  {% endif %}
+  {% if area and area.commute %}
+    <h4 style="margin-top:10px;">通勤时间</h4>
+    <ul>
+      {% if area.commute.user_min %}<li>用户工作地: {{ area.commute.user_min }} 分钟</li>{% endif %}
+      {% if area.commute.partner_min %}<li>伴侣工作地: {{ area.commute.partner_min }} 分钟</li>{% endif %}
+    </ul>
+  {% endif %}
+  {% if record.school_zone %}
+    <h4 style="margin-top:10px;">学区</h4>
+    <p>{{ record.school_zone | join(' · ') }}</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endmacro %}
+
+
+{# === HR Summary callout: condition snapshot + link to full home_report === #}
+{% macro hr_summary(record, parsed=None) %}
+<section class="section" id="hr-summary">
+  <h3>📄 Home Report 速览</h3>
+  <p style="font-size:13px;color:#4a5568;margin-bottom:10px;">
+    这套房子的官方 Home Report 给出以下关键判断（解析自 PDF，未经我们二次加工）：
+  </p>
+  <ul style="font-size:13.5px;line-height:1.7;">
+    {% if record.hr_valuation %}
+      <li><strong>市场估价</strong>：£{{ '{:,.0f}'.format(record.hr_valuation) }}
+        {% if record.asking_price and record.asking_price != record.hr_valuation %}
+          （挂牌 £{{ '{:,.0f}'.format(record.asking_price) }}，差 {{ '%+.1f'|format((record.asking_price - record.hr_valuation) / record.hr_valuation * 100) }}%）
+        {% endif %}
+      </li>
+    {% endif %}
+    {% if record.cat3_count is not none or record.cat2_count is not none %}
+      <li><strong>状况评级</strong>：
+        {% if record.cat3_count %}<span style="color:#c53030;">{{ record.cat3_count }} 个 Cat 3（需立即处理）</span> · {% endif %}
+        {{ record.cat2_count or 0 }} 个 Cat 2（需关注） · 其余 Cat 1
+        {% if record.roof_issue %} · <span style="color:#d97706;">屋顶被标记</span>{% endif %}
+      </li>
+    {% endif %}
+    {% if record.epc_rating %}
+      <li><strong>能效</strong>：EPC {{ record.epc_rating }}{% if record.epc_score %} ({{ record.epc_score }}/100){% endif %}{% if record.gas_heating %} · Gas 中央供暖{% endif %}</li>
+    {% endif %}
+    {% if record.factor_status %}
+      <li><strong>物业管理</strong>：{{ record.factor_status }}{% if record.factor_monthly %} · £{{ record.factor_monthly }}/月{% endif %}{% if not record.building_insurance %} · 公共建筑保险需自购{% endif %}</li>
+    {% endif %}
+    {% if record.ownership_years %}
+      <li><strong>屋主持有</strong>：{{ record.ownership_years }} 年</li>
+    {% endif %}
+  </ul>
+
+  {% set concerning = (parsed.condition_table or []) | selectattr('cat', 'in', ['2','3']) | list %}
+  {% if concerning %}
+  <h4 style="margin-top:12px;">⚠️ 测量员标记的具体项（{{ concerning|length }} 项）</h4>
+  <ul style="font-size:12.5px;line-height:1.6;">
+    {% for row in concerning[:6] %}
+      <li>
+        <span class="cat-pill cat{{ row.cat }}">Cat {{ row.cat }}</span>
+        <strong>{{ row.row }}</strong>
+        <span class="page-ref">p.{{ row.page }}</span>
+        — <small>{{ row.notes }}</small>
+      </li>
+    {% endfor %}
+    {% if concerning|length > 6 %}
+      <li><small>……还有 {{ concerning|length - 6 }} 项，看 Cat 表完整列表</small></li>
+    {% endif %}
+  </ul>
+  {% endif %}
+
+  {% if record.pdf_path %}
+  <p style="margin-top:12px;">
+    <a class="link-chip" href="file://{{ record.pdf_path }}" target="_blank" rel="noopener">
+      📄 打开原始 Home Report PDF
+    </a>
+  </p>
+  {% endif %}
+</section>
+{% endmacro %}
+
+
+{# === Location card: embedded map + external links === #}
+{% macro location_card(record) %}
+{% set map_query = record.postcode or record.address %}
+{% if map_query or record.listing_url %}
+<div class="location-card">
+  {% if map_query %}
+  <iframe
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade"
+    src="https://maps.google.com/maps?q={{ map_query|urlencode }}&t=&z=15&ie=UTF8&iwloc=&output=embed"
+    title="Map of {{ record.address }}"></iframe>
+  {% endif %}
+  <div class="link-chips">
+    {% if map_query %}
+      <a class="link-chip primary" target="_blank" rel="noopener"
+         href="https://www.google.com/maps/search/?api=1&query={{ map_query|urlencode }}">
+        🗺️ Open in Maps
+      </a>
+    {% endif %}
+    {% if record.listing_url %}
+      <a class="link-chip" target="_blank" rel="noopener" href="{{ record.listing_url }}">
+        🏠 {% if 'rightmove' in record.listing_url %}Rightmove{% elif 'espc' in record.listing_url %}ESPC{% else %}房源链接{% endif %}
+      </a>
+    {% endif %}
+    {% if record.postcode %}
+      <a class="link-chip" target="_blank" rel="noopener"
+         href="https://www.scotlandscensus.gov.uk/search-the-census#/explore/find-area?postcode={{ record.postcode|urlencode }}">
+        📊 SIMD
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+
+{# === Score badge for header === #}
+{% macro score_badge(score) %}
+{% if score >= 80 %}
+  <div class="score-badge s-high">{{ score|int }}</div>
+{% elif score >= 45 %}
+  <div class="score-badge s-mid">{{ score|int }}</div>
+{% else %}
+  <div class="score-badge s-low">{{ score|int }}</div>
+{% endif %}
+{% endmacro %}
+
+
+{# === Score breakdown (7 bars), with optional opinion to show corrections === #}
+{% macro score_breakdown(breakdown, opinion=None) %}
+{% set ns = namespace(delta=0) %}
+{% if opinion and opinion.score_corrections %}
+  {% for f in opinion.score_corrections if f.score_delta %}
+    {% set ns.delta = ns.delta + f.score_delta %}
+  {% endfor %}
+{% endif %}
+{% set total_delta = ns.delta %}
+<section class="section" id="scoring">
+  <h3>📊 评分详情</h3>
+  {% for d in breakdown.dimensions %}
+    {% set pct = (d.score / d.max_score * 100) if d.max_score else 0 %}
+    <div class="score-row">
+      <div class="label">{{ d.name }} —
+        <span style="color:{% if d.score >= d.max_score * 0.7 %}#38a169{% elif d.score < 0 %}#c53030{% else %}#d69e2e{% endif %}">{{ '%g'|format(d.score) }}</span>
+        / {{ '%g'|format(d.max_score) }}
+      </div>
+      <div class="score-bar">
+        <div class="score-bar-fill {% if pct >= 90 %}full{% elif pct < 30 %}low{% endif %}"
+             style="width: {{ pct|int|abs }}%"></div>
+      </div>
+      <div class="detail">{{ d.detail }}</div>
+    </div>
+  {% endfor %}
+  <p style="text-align:right; margin-top:10px; font-size:14px;">
+    总分 <strong style="font-size:18px;">{{ breakdown.total }}</strong> / 100
+    {% if total_delta %}
+      <span class="total-corrected">⚡ 评估师调整 {{ '%+.1f'|format(total_delta) }} → {{ '%g'|format(breakdown.total + total_delta) }}</span>
+    {% endif %}
+    <br>{{ breakdown.recommendation }}
+  </p>
+  {% if total_delta %}
+  <p style="margin-top:6px; font-size:12px; color:#718096;">
+    括号内为机械评分；评估师基于 <a href="#opinion-2" style="color:#2c5282;">② 评分校正</a> 给出修正建议。
+  </p>
+  {% endif %}
+</section>
+{% endmacro %}
+
+
+{# === Cat 2 / Cat 3 table === #}
+{% macro condition_table(condition_rows) %}
+<section class="section" id="condition">
+  <h3>🔎 Condition 表</h3>
+  <table class="cat-table">
+    <thead><tr><th>项目</th><th>Cat</th><th>p.</th><th>Notes</th></tr></thead>
+    <tbody>
+    {% for row in condition_rows %}
+      {% if row.cat in ('2', '3') %}
+      <tr>
+        <td>{{ row.row }}</td>
+        <td><span class="cat-pill cat{{ row.cat }}">Cat {{ row.cat }}</span></td>
+        <td><small>p.{{ row.page }}</small></td>
+        <td><small>{{ row.notes }}</small></td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endmacro %}

@@ -1,0 +1,46 @@
+# === Secrets — NEVER commit ===
+.env
+.env.local
+*.secret
+
+# === Personal preferences ===
+# Ship preferences.example.json (template); user-specific preferences.json stays local
+preferences.json
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+
+# === macOS / IDE ===
+.DS_Store
+.vscode/
+.idea/
+
+# === Local data (per-user property cache) ===
+# LocalJSONStorage default
+.property_data/
+
+# === Source PDFs / Home Reports (your real ones) ===
+HomeReports/
+*.pdf
+
+# === Test fixtures with real data (don't commit real PDFs) ===
+tests/fixtures/*_real.*
+
+# === Generated reports ===
+# Generated HTML reports live in ~/Downloads or ~/.property_data/reports
+# Both are outside the repo, but if anything leaks in:
+*_analysis.html
+*_viewing_brief.html
+*_compare.html
+_REAL_*.html
+_PREVIEW_*.html
+_M2_*.html
