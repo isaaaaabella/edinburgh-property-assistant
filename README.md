@@ -161,16 +161,16 @@ sequenceDiagram
 
   U->>S: /home-report ~/x.pdf
   S->>P: subprocess parse PDF
-  P-->>S: parsed.json (22 fields + condition table + contradictions)
-  S->>L: generate SurveyorOpinion JSON<br/>(grounded in parsed.json)
+  P-->>S: parsed.json - 22 fields + condition table + contradictions
+  S->>L: generate SurveyorOpinion JSON<br/>grounded in parsed.json
   L-->>S: opinion.json
   S->>V: validate --parsed --opinion
-  V-->>S: ok (or errors; retry 1x)
-  S->>Pipe: run(pdf, opinion, parsed)
-  Pipe->>Pipe: compute score (7 dimensions)
+  V-->>S: ok, or errors and retry 1x
+  S->>Pipe: run pdf, opinion, parsed
+  Pipe->>Pipe: compute score - 7 dimensions
   Pipe->>Pipe: render layered-cards HTML
   Pipe->>ST: upsert + attach_html_report
-  Pipe-->>U: ✓ HTML path + summary
+  Pipe-->>U: HTML path + summary
 ```
 
 [`docs/INSTALL.md`](docs/INSTALL.md) 有详细安装步骤；[`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) 是各集成（Notion / Gmail / Google Maps）的可选配置。
