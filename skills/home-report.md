@@ -12,7 +12,14 @@
 /home-report <PDF_PATH>
 /home-report <PDF_PATH> --out <HTML_PATH>
 /home-report <PDF_PATH> --listing <RIGHTMOVE_URL>
+/home-report <PDF_PATH> --viewing "YYYY-MM-DD HH:MM"
 ```
+
+可组合：`--listing` + `--viewing` 同时给即可一次性填齐。
+
+- `--listing` 触发 Rightmove 抓取（og:image 作为 Notion 封面 + asking price → 「挂牌价(£)」+ listing URL 写入）
+- `--viewing` 接受 wall-clock Europe/London 时间（自动算 BST/GMT 偏移），写入 PropertyRecord.viewing_date + Notion「Viewing时间」full datetime
+- pipeline 默认会自动跑 `fetch_area_data.py` → 学区命中通过 Edinburgh Council ArcGIS catchment API 写入 PropertyRecord.school_zone（落到 Notion「学区」multi_select）— 加 `--skip-area` 跳过
 
 ## 第一步：解析 PDF
 
@@ -198,22 +205,25 @@ python -m property_assistant.analysis.surveyor_opinion validate \
 ## 第四步：跑 pipeline（评分 + 渲染 + 入库）
 
 ```bash
-TLDR="<提取 overall_positioning[0] + offer_direction[0] 做一句话执行摘要，≤120 字>"
 python -m property_assistant.pipelines.home_report run \
     "$PDF" \
     --opinion "/tmp/opinion_$$.json" \
     --parsed "$PARSED" \
-    ${OUT:+--out "$OUT"}
+    ${OUT:+--out "$OUT"} \
+    ${LISTING:+--listing "$LISTING"} \
+    ${VIEWING:+--viewing "$VIEWING"}
 ```
 
 pipeline 内部自动：
-1. 计算评分（`analysis.scoring.compute`）—— 7 维度 0-100 分
-2. 再次 validate（双保险）—— 失败抛 `OpinionValidationError`
-3. 渲染 HTML（含分层卡片 + 评估师意见 6 段 + 评分校正显示）
-4. `upsert_property` 写入当前 backend（local 默认 / notion 当 `STORAGE_BACKEND=notion`）
-5. `attach_html_report` 把 HTML 路径写到 Notion `HTML报告` URL 列 + callout 摘要 block；或拷贝到 `~/.property_data/reports/<slug>/`
-
-如果 `--listing <URL>` 提供了，先 `upsert_property` 一次写入 `listing_url`。
+1. 跑 `fetch_area_data.py`（含学区 catchment 查询）→ 填 `record.school_zone`
+2. 如果 `--listing` 给了：抓 Rightmove → 填 `listing_url` + `asking_price`，留 cover URL 给 Notion
+3. 如果 `--viewing` 给了：解析成 Europe/London datetime，填 `record.viewing_date`
+4. 计算评分（`analysis.scoring.compute`）—— 7 维度 0-100 分
+5. 再次 validate opinion（双保险）—— 失败抛 `OpinionValidationError`
+6. 渲染 HTML（含分层卡片 + 评估师意见 6 段 + 评分校正显示）
+7. `upsert_property` 写入当前 backend（local 默认 / notion 当 `STORAGE_BACKEND=notion`）
+8. `attach_html_report` 把 HTML 路径写到 Notion `HTML报告` URL 列 + callout 摘要 block；或拷贝到 `~/.property_data/reports/<slug>/`
+9. Notion-only post-patch：cover image (page level) + Viewing时间 full datetime（默认 date 转换会截断时间）
 
 ## 第五步：终端摘要
 

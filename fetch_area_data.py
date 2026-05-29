@@ -73,6 +73,8 @@ def get_postcode_data(postcode):
         return {
             "lat": result["latitude"],
             "lon": result["longitude"],
+            "eastings": result.get("eastings"),
+            "northings": result.get("northings"),
             # SIMD 2020 uses 2011 Data Zones (lsoa11); lsoa is the 2021 code
             "data_zone": codes.get("lsoa11") or codes.get("lsoa"),
             "admin_district": result.get("admin_district"),
@@ -80,6 +82,60 @@ def get_postcode_data(postcode):
         }, None
     except Exception as e:
         return None, f"postcodes.io 解析失败: {e}"
+
+# ── School catchments (Edinburgh Council ArcGIS) ─────────────────────────
+# 4 layers under MiscBoundaries/MapServer; sourceSR is EPSG:27700 BNG so we
+# query in eastings/northings (postcodes.io gives both for free).
+SCHOOL_CATCHMENT_BASE = (
+    "https://edinburghcouncilmaps.info/arcgis/rest/services/"
+    "AdminBoundaries/MiscBoundaries/MapServer"
+)
+SCHOOL_LAYERS = [
+    # (layer_id, kind, field_name_holding_school_name)
+    (4, "primary_nd", "SCHOOL_NAM"),
+    (5, "primary_rc", "SCHOOL_NAM"),
+    (6, "secondary_nd", "SCHOOL"),
+    (7, "secondary_rc", "SCHOOL"),
+]
+
+def get_school_catchments(eastings, northings):
+    """Point-in-polygon against Edinburgh Council catchment layers.
+
+    Returns {primary_nd: [...], primary_rc: [...], secondary_nd: [...],
+             secondary_rc: [...], schools_flat: [unique school names]}.
+    Outside Edinburgh / API error → empty lists, error in 'error' field.
+    """
+    if eastings is None or northings is None:
+        return {"error": "缺 eastings/northings", "schools_flat": []}
+    geom = json.dumps({"x": eastings, "y": northings,
+                       "spatialReference": {"wkid": 27700}})
+    out = {"primary_nd": [], "primary_rc": [],
+           "secondary_nd": [], "secondary_rc": [], "schools_flat": []}
+    seen = set()
+    for layer_id, key, field in SCHOOL_LAYERS:
+        params = urllib.parse.urlencode({
+            "geometry": geom, "geometryType": "esriGeometryPoint",
+            "inSR": "27700", "spatialRel": "esriSpatialRelIntersects",
+            "outFields": field, "returnGeometry": "false", "f": "json",
+        })
+        url = f"{SCHOOL_CATCHMENT_BASE}/{layer_id}/query?{params}"
+        status, text = http_get(url, timeout=10)
+        if status != 200:
+            out.setdefault("error", f"layer /{layer_id}: HTTP {status}")
+            continue
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        for feat in data.get("features", []):
+            name = (feat.get("attributes") or {}).get(field)
+            if not name:
+                continue
+            out[key].append(name)
+            if name not in seen:
+                seen.add(name)
+                out["schools_flat"].append(name)
+    return out
 
 # ── Step 2: SIMD 2020 ──────────────────────────────────────────────────
 SIMD_CACHE_PATH = os.path.expanduser("~/.property_assistant_simd_cache.json")
@@ -416,6 +472,12 @@ def main():
         "commute_partner_min": None,
         "commute_partner_route": None,
         "commute_available": False,
+        "school_primary_nd": [],
+        "school_primary_rc": [],
+        "school_secondary_nd": [],
+        "school_secondary_rc": [],
+        "schools_flat": [],
+        "schools_available": False,
     }
 
     # Step 1: 坐标 + 数据区
@@ -431,6 +493,22 @@ def main():
         "admin_district": geo["admin_district"],
     })
     sys.stderr.write(f"  → 坐标: ({geo['lat']}, {geo['lon']})，数据区: {geo['data_zone']}\n")
+
+    # Step 1.5: 学区（Edinburgh Council ArcGIS catchment layers）
+    sys.stderr.write("🏫 查询学区...\n")
+    schools = get_school_catchments(geo.get("eastings"), geo.get("northings"))
+    output.update({
+        "school_primary_nd": schools["primary_nd"],
+        "school_primary_rc": schools["primary_rc"],
+        "school_secondary_nd": schools["secondary_nd"],
+        "school_secondary_rc": schools["secondary_rc"],
+        "schools_flat": schools["schools_flat"],
+        "schools_available": bool(schools["schools_flat"]),
+    })
+    if schools["schools_flat"]:
+        sys.stderr.write(f"  → {' / '.join(schools['schools_flat'])}\n")
+    else:
+        sys.stderr.write(f"  ⚠️  无学区命中（{schools.get('error') or '该邮编不在 Edinburgh Council 范围'}）\n")
 
     # Step 2: SIMD
     if not args.skip_simd:

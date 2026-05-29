@@ -20,18 +20,20 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 from property_assistant.analysis.scoring import ScoreBreakdown, compute
 from property_assistant.analysis.surveyor_opinion import SurveyorOpinion
 from property_assistant.core.property_record import PropertyRecord
+from property_assistant.parsers.rightmove import fetch_listing_meta
 from property_assistant.render.renderer import render_home_report
 from property_assistant.storage import get_storage
 
 
 PARSE_SCRIPT = Path(__file__).resolve().parent.parent / "parse_home_report.py"
+AREA_SCRIPT = Path(__file__).resolve().parent.parent / "fetch_area_data.py"
 
 
 class OpinionValidationError(Exception):
@@ -70,6 +72,54 @@ def parse_pdf(pdf_path: Path) -> dict[str, Any]:
         raise RuntimeError(f"parser output not valid JSON: {exc}\nFirst 500 chars: {proc.stdout[:500]}")
 
 
+def fetch_area(postcode: str) -> dict[str, Any] | None:
+    """Run fetch_area_data.py for postcode → dict (or None on failure).
+
+    Never raises — area data is enrichment, not blocking. Skips SIMD/flood
+    if they're slow; keeps schools (the only one we currently feed back
+    into PropertyRecord).
+    """
+    if not AREA_SCRIPT.exists() or not postcode:
+        return None
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(AREA_SCRIPT), "--postcode", postcode],
+            capture_output=True, text=True, timeout=60,
+        )
+        if proc.returncode != 0:
+            return None
+        return json.loads(proc.stdout)
+    except Exception:
+        return None
+
+
+def parse_viewing(s: str) -> tuple[date, str]:
+    """Parse '2026-05-29' or '2026-05-29 18:30' → (date, iso_with_tz_or_date).
+
+    Wall-clock time interpreted as Europe/London — Notion gets the correct
+    BST/GMT offset for any date (user-memory rule: never UTC).
+    """
+    s = s.strip()
+    if " " in s:
+        d_part, t_part = s.split(" ", 1)
+    elif "T" in s:
+        d_part, t_part = s.split("T", 1)
+    else:
+        d_part, t_part = s, None
+    d = date.fromisoformat(d_part)
+    if t_part is None:
+        return d, d.isoformat()
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("Europe/London")
+    except Exception:  # noqa: BLE001 — fallback for ancient Pythons
+        tz = None
+    hhmm = (t_part if len(t_part) >= 5 else f"{t_part}:00")[:5]
+    hour, minute = (int(x) for x in hhmm.split(":"))
+    dt = datetime(d.year, d.month, d.day, hour, minute, 0, tzinfo=tz)
+    return d, dt.isoformat()
+
+
 def run(
     pdf_path: Path | str,
     *,
@@ -77,7 +127,10 @@ def run(
     out_html: Path | str | None = None,
     parsed: dict[str, Any] | None = None,
     area: dict[str, Any] | None = None,
+    listing_url: str | None = None,
+    viewing: str | None = None,
     skip_storage: bool = False,
+    skip_area: bool = False,
 ) -> RunResult:
     """Execute the full pipeline.
 
@@ -87,8 +140,15 @@ def run(
                      (in production: written by SKILL.md before calling this)
         out_html: HTML output path (default: alongside PDF as <name>_analysis.html)
         parsed: pre-parsed JSON, skips re-parsing if provided (mainly for tests)
-        area: pre-fetched area data dict (optional)
+        area: pre-fetched area data dict (optional). If None and skip_area
+              is False, this pipeline runs fetch_area_data.py for postcode.
+        listing_url: Rightmove URL — scraped for cover image + asking price,
+                     written into PropertyRecord.{listing_url, asking_price};
+                     image_url passed to storage as page cover (Notion).
+        viewing: "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" wall-clock (Europe/London)
+                 → record.viewing_date + full ISO datetime for Notion patch.
         skip_storage: if True, do not write to backend storage (for previews)
+        skip_area: if True, do not call fetch_area_data.py
     """
     pdf_path = Path(pdf_path).expanduser().resolve()
     opinion_path = Path(opinion_path).expanduser().resolve()
@@ -105,6 +165,33 @@ def run(
     # 2. PropertyRecord
     record = PropertyRecord.from_parsed(parsed)
     record.pdf_path = str(pdf_path)
+
+    # 2.5 Area data (lat/lon, SIMD, flood, schools, commute) — non-blocking enrichment
+    if area is None and not skip_area and record.postcode:
+        area = fetch_area(record.postcode)
+    if area:
+        # School zone is the only area datum we currently write back into
+        # PropertyRecord (Notion has its own 学区 multi_select column).
+        flat = area.get("schools_flat") or []
+        if flat and not record.school_zone:
+            record.school_zone = flat
+
+    # 2.6 Rightmove listing meta — fills listing_url + asking_price + cover
+    cover_url: str | None = None
+    if listing_url:
+        meta = fetch_listing_meta(listing_url)
+        record.listing_url = listing_url
+        if meta.get("asking_price") and not record.asking_price:
+            record.asking_price = float(meta["asking_price"])
+        cover_url = meta.get("image_url")
+        if meta.get("error"):
+            print(f"warning: rightmove scrape: {meta['error']}", file=sys.stderr)
+
+    # 2.7 Viewing date — record.viewing_date is `date`; Notion needs datetime
+    viewing_iso: str | None = None
+    if viewing:
+        d_val, viewing_iso = parse_viewing(viewing)
+        record.viewing_date = d_val
 
     # 3. Score
     breakdown = compute(record)
@@ -140,6 +227,13 @@ def run(
             storage.attach_html_report(pid, str(out_html), "home_report")
         except Exception as exc:  # noqa: BLE001
             print(f"warning: attach_html_report failed: {exc}", file=sys.stderr)
+        # Notion-only post-upsert patches (cover image + full viewing datetime)
+        if storage_backend_name == "notion" and pid and (cover_url or viewing_iso):
+            try:
+                _notion_post_patch(storage, pid, cover_url=cover_url,
+                                   viewing_iso=viewing_iso)
+            except Exception as exc:  # noqa: BLE001
+                print(f"warning: notion post-patch failed: {exc}", file=sys.stderr)
 
     return RunResult(
         record=record,
@@ -149,6 +243,27 @@ def run(
         parsed_path=parsed_dump_path,
         opinion_path=opinion_path,
     )
+
+
+def _notion_post_patch(storage, page_id: str, *, cover_url: str | None,
+                       viewing_iso: str | None) -> None:
+    """Apply Notion-specific fields the default upsert can't express.
+
+    - cover image: Notion API supports `cover.external.url` on the page level
+    - viewing datetime: the default `date` converter strips the time part,
+      so we PATCH the raw ISO with offset directly.
+    """
+    payload: dict = {}
+    if cover_url:
+        payload["cover"] = {"type": "external", "external": {"url": cover_url}}
+    if viewing_iso and "T" in viewing_iso:
+        payload.setdefault("properties", {})["Viewing时间"] = {
+            "date": {"start": viewing_iso}
+        }
+    if not payload:
+        return
+    # Reuse the storage's HTTP layer for auth + headers.
+    storage._request("PATCH", f"/pages/{page_id}", payload)
 
 
 def _cli() -> int:
@@ -163,8 +278,12 @@ def _cli() -> int:
     r.add_argument("--opinion", required=True, help="SurveyorOpinion JSON path")
     r.add_argument("--parsed", help="Pre-parsed JSON path (skips re-parsing)")
     r.add_argument("--out", help="HTML output path (default: <pdf>_analysis.html)")
+    r.add_argument("--listing", help="Rightmove URL — scrapes cover image + asking price")
+    r.add_argument("--viewing", help="'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM' wall-clock (Europe/London)")
     r.add_argument("--skip-storage", action="store_true",
                    help="Don't write to backend storage (preview-only)")
+    r.add_argument("--skip-area", action="store_true",
+                   help="Skip fetch_area_data.py (no SIMD/flood/school enrichment)")
     args = ap.parse_args()
 
     if args.cmd != "run":
@@ -181,7 +300,10 @@ def _cli() -> int:
             opinion_path=args.opinion,
             out_html=args.out,
             parsed=parsed_dict,
+            listing_url=args.listing,
+            viewing=args.viewing,
             skip_storage=args.skip_storage,
+            skip_area=args.skip_area,
         )
     except OpinionValidationError as exc:
         print(str(exc), file=sys.stderr)
