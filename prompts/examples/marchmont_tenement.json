@@ -1,0 +1,56 @@
+{
+  "_meta": {
+    "scenario": "Marchmont 1890 维多利亚 Tenement，3/3 楼，92 m²，HR £450k",
+    "use_when": "building_type 含 'Victorian' / 'Tenement' 且 era < 1919",
+    "note": "学 voice 和 grounding 密度，不要照抄数字 / 事实。所有市场数据必须当次 web search 查证，不能凭印象写百分比。"
+  },
+  "overall_positioning": [
+    {"kind": "fact", "text": "1890s 维多利亚 Tenement，3/3 楼，92 m²，pink sandstone Scots Baronial", "evidence_page": 4,
+     "quote": "Mid-terraced flat within traditional stone-built tenement constructed circa 1890"},
+    {"kind": "judgment", "text": "经典爱丁堡保值资产 — 但顶层位置压抑总分",
+     "rationale": "Marchmont 维多利亚 Tenement 是爱丁堡南区房价最稳的资产类型之一（具体长期升值幅度查 ESPC 历史数据）。顶层（3/3）是这类房子唯一的弱点：屋顶漏水风险 + 隔音差，估价折扣约 5-8% 是行业经验值。这套 HR £450k 已经把折扣算进去了。"}
+  ],
+  "score_corrections": [
+    {"kind": "judgment", "text": "Rainwater Cat 2 实质是 timing artifact，建议回退 0.5 分",
+     "contradiction_id": "Rainwater fittings_p17", "score_delta": 0.5,
+     "rationale": "测量员标 Cat 2 通常因没法现场验证排水。这里 notes 明确写 was not raining at inspection —— 不是发现问题，是无法测试。Edinburgh Pre-1919 Tenement 屋顶有这条 Cat 2 是普遍现象，不代表实际有漏。",
+     "quote": "Was not raining at time of inspection; recommend further investigation during heavy rainfall"}
+  ],
+  "real_concerns": [
+    {"kind": "judgment", "text": "共有楼梯维护协议是黑盒",
+     "rationale": "Tenement 公共楼梯按 1979 年 Tenements (Scotland) Act 是全体业主分担成本。HR 没说清是有专业 Factor 管理还是业主自治。前者 Edinburgh 典型月费 £15-30 包烟囱清扫；后者意味着 5-8 年大修要全体投票分钱，纠纷常见。看房时直接问。"},
+    {"kind": "assumption", "text": "HR 未列出 EPC 改造潜力",
+     "rationale": "当前 EPC C/72 分。距离 B (81+) 有 9 分缺口，可能涉及窗户升级（行业范围 £8-15k，conservation area 内材料受限会更贵 — Marchmont 在 Marchmont/Meadows/Bruntsfield Conservation Area 内，1996 年加了 Article 4 Directions，外窗替换受规划局管控）。如果未来出租用途要算这笔。"}
+  ],
+  "valuation_judgment": [
+    {"kind": "fact", "text": "HR 估价 £450,000", "evidence_page": 5},
+    {"kind": "judgment", "text": "估价是否合理 → 查 ESPC EH9 近 6 个月 3 床 Victorian Tenement closed prices 中位数对照",
+     "rationale": "Marchmont 近 12 个月均价约 £446k（Rightmove 该 area 数据），HR £450k 已经接近近期成交均价，HR 在苏格兰 closed-bid 系统下通常是保守锚点。具体到这套 3/3 顶层，对照 ESPC 同条件成交（带顶层 flag）取中位数才是真锚点。如果挂牌价 £450-455k 走 offers over，按 Marchmont Tenement 历史 frenzy 模式可能 5-10% 上调成交。"}
+  ],
+  "offer_direction": [
+    {"kind": "judgment", "text": "策略看卖方挂牌方式 — offers over vs fixed price 完全不同打法",
+     "rationale": "offers over：按 ESPC 同条件中位数 M 出，offer M + 1-3% 测竞争激烈度；如有 closing date 则按 M + 5-10% 准备（Marchmont Tenement 在 closing date 下经常超 HR 10-15% 成交）。fixed price：按 HR ±1% 出（£446k-£455k），测下调空间。"},
+    {"kind": "judgment", "text": "Mortgage 用 80% LTV，留 £40k 现金 buffer",
+     "rationale": "1890s 房子第一年通常需要 £5-15k 临时维修（烟囱 repointing / boiler 更换 — 行业范围）。Tenement 又有共有楼梯 surprise costs。Conservation area 内材料受限会推高维修单价。"}
+  ],
+  "viewing_priorities": [
+    {"kind": "judgment", "text": "问 Factor 月费明细 + 上次共有维修是哪年",
+     "rationale": "Factor £18/月听起来低，要问清楚是否包含 building insurance、烟囱清扫、楼道清洁。Edinburgh Factor 行业典型 £15-30/月，低于这个区间通常是 partial cover。"},
+    {"kind": "judgment", "text": "看顶层 ceiling angles 和 sky light（如有）",
+     "rationale": "3/3 顶层经常斜屋顶，标称 92m² usable 可能因斜顶损失 8-15%。直接量 head clearance 看哪些区域算 effective floor area。"},
+    {"kind": "judgment", "text": "问最近 5 年是否做过屋顶或外墙工程",
+     "rationale": "Scottish slate 寿命 100+ 年很常见（Engine Shed / Historic Environment Scotland 行业资料），但「nail sickness」（钉子锈穿）是苏格兰特别相关的问题。如果上次大修 >40 年前则下个 10 年大概率要做 re-fix 或 partial re-slate，£8-20k 摊到每户（具体看楼宇产权人数）。"}
+  ],
+  "additional_thoughts": [
+    {"kind": "fact", "text": "Marchmont 是 Sir George Warrender 1869 年规划的 middle-class 新城",
+     "rationale": "原 plan 由 architect David Bryce 1869 年做的（联排 villa + 大独立 villa），后被 John Watherston & Sons 改成全 4-5 层 tenement，主体 1870s-80s 建成（Wikipedia / British Listed Buildings）。所以 Marchmont 整片 Tenement 同期建造、同一波 Scots Baronial 风格、pink sandstone — 这是为什么这里的 comparables 数据特别干净（同年代同结构）。也是为什么 1880s vs 1890s 同区房子很少有显著结构差异。"},
+    {"kind": "fact", "text": "在 Marchmont/Meadows/Bruntsfield Conservation Area 内（1987 设立，1996 加 Article 4 Directions）",
+     "rationale": "City of Edinburgh Council 官方边界。Article 4 意味着规划局对外墙颜色、窗框材料（不能换 uPVC 必须 timber / hardwood）、屋顶材料、satellite dish 安装等都有额外管控。这对外观和保值有好处（街区不会乱），对你做 retrofit 是约束（替换 sash 窗造价比 uPVC 高 50-100%）。"},
+    {"kind": "judgment", "text": "学区是 James Gillespie's Primary + High School 黄金组合",
+     "rationale": "Marchmont 在 Gillespie's catchment 内（具体边界看 City of Edinburgh Council catchment map），Gillespie's High 是 Edinburgh state secondary league table 长期前列。这是 Marchmont Tenement 房价溢价的主因之一 — 同等条件下买在 catchment 外（比如 Newington / Tollcross 部分街道）通常显著便宜，差价具体百分比查 ESPC 不同 catchment 同条件对比。"},
+    {"kind": "judgment", "text": "Tenement 顶层的隐藏优势：不会有楼上邻居噪音",
+     "rationale": "3/3 顶层的隔音劣势是楼下传上来的，但反过来你也少了一个噪音源。对噪音敏感的人群（在家工作、有小孩）这是真实价值。一些买家专门找顶层，所以 5-8% 的顶层折扣不是所有人都买账。"},
+    {"kind": "fact", "text": "Marchmont 街名由来：Warrender 的妻子是 5th Earl of Marchmont 的女儿",
+     "rationale": "纯历史 trivia 但有时和中介聊得上。Thirlestane Street / Lauderdale Street 也是同样路数（Warrender 母亲家族的 Earl of Lauderdale + Thirlestane Castle）。这是为什么 Marchmont 一些街道名字听起来像贵族 estate — 它本来就是按 estate 规划的中产 tenement 区。"}
+  ]
+}

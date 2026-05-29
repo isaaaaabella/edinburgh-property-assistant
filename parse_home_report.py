@@ -795,6 +795,8 @@ def extract_valuations(pages: list[str]) -> tuple[FieldEvidence, FieldEvidence]:
         r"market\s+value[\s\S]{0,400}?£\s*([\d,]+)",
         # DM Hall: "Valuation (£) and Market Comments\nTwo Hundred...\n£285,000"
         r"Valuation\s+\(£\)[\s\S]{0,200}?£\s*([\d,]+)",
+        # Shepherd: "Market value in present condition" then form-aligned digits, no £ symbol
+        r"Market\s+value\s+in\s+present\s+condition[\s.]*([\d,]{3,})",
     ]
     reinst_patterns = [
         r"[Rr]einstatement[\s\S]{0,200}?£\s*([\d,]+)",
@@ -1058,22 +1060,58 @@ def extract_factor(pages: list[str], pq_range: SectionRange) -> tuple[FieldEvide
                     ls = line.strip()
                     if not ls:
                         continue
-                    if re.match(r"^(Yes|No|YES|NO|\[|If|Is|please|monthly|£)", ls, re.I):
+                    if re.match(r"^(Yes|No|YES|NO|\[|If|Is|please|monthly|annual|current|£)", ls, re.I):
                         continue
-                    if re.match(r"^[A-Z][\w&'\s]{3,80}$", ls):
+                    # Accept Title-Case lines incl. digits + / + , (factor names like
+                    # "Trinity 209/211 Bruntsfield Place" or "Charles White, Edinburgh")
+                    if re.match(r"^[A-Z][\w&'\s\-\.\/,]{3,80}$", ls):
                         cand = ls
                         break
             if cand:
                 name = FieldEvidence(value=cand[:120], page=pn, source=cand[:200])
 
-            # Cost — search ONLY inside Q12 window for £/month
+            # Cost — search ONLY inside Q12 window. Try monthly → annual → quarterly.
             cm = re.search(
-                r"£\s*(\d+(?:\.\d{2})?)\s*(?:per\s+month|/month|pcm|monthly)",
-                win,
-                re.I,
+                r"£\s*(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:per\s+month|/month|pcm|monthly)",
+                win, re.I,
             )
             if cm:
-                cost = FieldEvidence(value=float(cm.group(1)), page=pn, source=cm.group(0))
+                cost = FieldEvidence(
+                    value=float(cm.group(1).replace(",", "")),
+                    page=pn, source=cm.group(0),
+                )
+            else:
+                # Annual fee (Trinity / Charles White / James Gibb style: "Current annual charge £748.34")
+                am = re.search(
+                    r"(?:[Aa]nnual\s+(?:charge|fee|payment)|per\s+(?:year|annum))[\s:]*£\s*(\d+(?:,\d{3})*(?:\.\d{2})?)",
+                    win, re.I,
+                ) or re.search(
+                    r"£\s*(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:per\s+year|per\s+annum|/year|annually|p\.?a\.?)\b",
+                    win, re.I,
+                )
+                if am:
+                    annual = float(am.group(1).replace(",", ""))
+                    monthly = round(annual / 12, 2)
+                    cost = FieldEvidence(
+                        value=monthly, page=pn,
+                        source=f"{am.group(0).strip()} (annual ÷ 12 = £{monthly}/mo)",
+                    )
+                else:
+                    # Quarterly
+                    qm = re.search(
+                        r"(?:per\s+quarter|/quarter|quarterly)[\s:]*£\s*(\d+(?:,\d{3})*(?:\.\d{2})?)",
+                        win, re.I,
+                    ) or re.search(
+                        r"£\s*(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:per\s+quarter|/quarter|quarterly)",
+                        win, re.I,
+                    )
+                    if qm:
+                        quarterly = float(qm.group(1).replace(",", ""))
+                        monthly = round(quarterly / 3, 2)
+                        cost = FieldEvidence(
+                            value=monthly, page=pn,
+                            source=f"{qm.group(0).strip()} (quarterly ÷ 3 = £{monthly}/mo)",
+                        )
 
     return has_factor, name, cost, insurance
 
@@ -1131,6 +1169,10 @@ NEGATIVE_NOTES_PATTERNS = [
     r"\bnot\s+applicable\b",
     r"\bappears?\s+to\s+be\s+long[- ]?standing\b",
     r"\bnon[- ]?progressive\b",
+    # Shepherd cover-their-back: Cat 2 给的同时说"没测、只是例行建议"
+    r"\bprecautionary\s+check\b",
+    r"\bin\s+accordance\s+with\s+good\s+(?:maintenance\s+)?practice\b",
+    r"\bno\s+tests?\s+(?:were|was)?\s*carried\s+out\b",
 ]
 
 
@@ -1417,13 +1459,25 @@ def _hex_color_to_cat(hex_color: str) -> Optional[str]:
 # ----------------------------------------------------------------------------
 
 def detect_template(pages_layout: list[str]) -> str:
-    """Return one of: 'graham_sibbald' | 'dm_hall' | 'allied_surveyors' | 'unknown'."""
+    """Return one of: 'graham_sibbald' | 'dm_hall' | 'shepherd' | 'dhkk' | 'allied_surveyors' | 'unknown'.
+
+    Shepherd / DHKK / Graham Sibbald 都用 inline-digit condition tables（"Repair category 1"），
+    所以 condition table extraction 路径相同；这里区分仅用于 downstream voice / scoring norm。
+    """
     full = "\n".join(pages_layout)
     inline_digits = re.findall(r"[Rr]epair\s+[Cc]ategory[:\s]+([123\-])", full)
     colon_only = re.findall(r"Repair\s+category:", full)
     has_dmhall = bool(re.search(r"\bdmhall\.co\.uk\b|DM\s+Hall", full, re.I))
+    has_shepherd = bool(re.search(r"shepherd\.co\.uk|SHEPHERD\s+CHARTERED\s+SURVEYORS|J\s*&\s*E\s+Shepherd", full))
+    has_dhkk = bool(re.search(r"\bDHKK\b", full))
     if len(inline_digits) >= 5:
-        return "dm_hall" if has_dmhall else "graham_sibbald"
+        if has_dmhall:
+            return "dm_hall"
+        if has_shepherd:
+            return "shepherd"
+        if has_dhkk:
+            return "dhkk"
+        return "graham_sibbald"
     if colon_only and len(colon_only) >= 5:
         return "allied_surveyors"
     return "unknown"
@@ -1617,7 +1671,7 @@ def parse(pdf_path: str, debug: bool = False) -> dict:
     re_x["closing_date"] = FieldEvidence()  # never in HR; populated by /process-emails
 
     # === condition_table ===
-    if template in ("graham_sibbald", "dm_hall"):
+    if template in ("graham_sibbald", "dm_hall", "shepherd", "dhkk"):
         condition_rows = extract_condition_table_textual(pages_layout, sections["single_survey"])
     elif template == "allied_surveyors":
         condition_rows = extract_condition_table_image(

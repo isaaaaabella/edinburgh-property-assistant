@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "scenario": "Fountainbridge 2015 现代公寓，2 床 70 m²，3rd floor of 5，timber frame + render，HR £320k，Factor £180/月",
+    "use_when": "era ≥ 1980 或 building_type 含 'modern' / 'flat' / '现代公寓' / 'apartment'（非 Victorian Tenement）",
+    "note": "学 voice 和 grounding 密度，不要照抄数字 / 事实。所有市场数据必须当次 web search 查证，不能凭印象写百分比。"
+  },
+  "overall_positioning": [
+    {"kind": "fact", "text": "2015 timber-frame 现代公寓，2 床 70 m²，3/5 楼，EPC B/82", "evidence_page": 4,
+     "quote": "Purpose-built modern apartment of timber frame construction with brick and render finish, completed 2015, within a 5-storey block"},
+    {"kind": "judgment", "text": "Fountainbridge 现代公寓 — ready-to-live 但慢升值，适合双职业 couple 不适合长住家庭",
+     "rationale": "这类房子最大卖点是「钥匙拿了就住」：EPC B 取暖费低、boiler 还有保、no 共有楼梯纠纷、有电梯有 underground parking。代价是：(a) Service charge 不可控（Factor 月费 £180 是建商 retain 阶段价，hand-over 后通常涨）(b) 升值速度慢于同区 Victorian Tenement（具体长期对比查 ESPC 历史数据）(c) Edinburgh 2022 起全市是 short-term let control area，secondary letting 在 tenement 楼大量被拒（City of Edinburgh Council 官方政策），出租投资 model 受限。如果你买这套是「住 3-5 年职业稳定后换房」，对的；奔着长期增值或 Airbnb 套利，类型不对。"}
+  ],
+  "score_corrections": [
+    {"kind": "judgment", "text": "Heating system Cat 2 实质是 service due date 形式问题，回退 0.3 分",
+     "contradiction_id": "Heating system_p18", "score_delta": 0.3,
+     "rationale": "notes 写 boiler 2015 年装、annual service overdue 8 个月 → default Cat 2，但同时写 functioning normally at inspection。boiler 2015 年装的现在 11 年，行业典型 lifespan 15-20 年，还在中段。先补一次 service（£100-150）通常就回 Cat 1。",
+     "quote": "Heating system functioning normally at inspection; annual service overdue, recommend immediate service to maintain warranty"}
+  ],
+  "real_concerns": [
+    {"kind": "judgment", "text": "Cladding / EWS1 是现代公寓最严重的隐藏风险",
+     "rationale": "Post-Grenfell (2017) 苏格兰路径是 Single Building Assessment (SBA) 替代 EWS1。6 层以上 + 任何 cladding 强制要 EWS1；4 层以下 + ACM/MCM/HPL cladding 也可能要（RICS 官方 FAQ）。这套 5 层 + timber frame + render — 在灰色区域，得问中介有没有 EWS1 / SBA 报告。重点：苏格兰可能 each flat 需要 separate EWS1（vs England 一栋楼一份），所以「楼里别的 flat 有 EWS1」不等于你有。评级 B2 直接不能卖 — 这是 mortgage application 的硬卡点。Missives 阶段务必 solicitor 拿到正式文件。"},
+    {"kind": "judgment", "text": "Service charge inflation 是 5 年后的真实账单",
+     "rationale": "现代公寓建商通常 retain factor management first 5-10 年，hand-over 给业主选举的 Owners Association 后涨幅常 30-50%（建商定价偏低吸引买家，真实成本 hand-over 后才显化）。这套 2015 年盖，2025 年正好是 hand-over 窗口。问中介：现在的 £180/月里包什么？过去 3 年涨幅曲线？哪一年开始 owners control？"},
+    {"kind": "judgment", "text": "Short-term let 路被堵 — 投资退路减少",
+     "rationale": "Edinburgh 全市 2022 年 9 月 5 日起是 STL control area，2022 年 10 月 1 日起 licensing 强制。Secondary letting（你不住、整套出租）在 tenement 楼大量被拒（City of Edinburgh Council 官方政策）。Annual fee £120-5,869 看占用人数。意味着：你如果工作变动想短期 Airbnb 几个月再回来，行不通；想长期出租 (AST) 仍可以但回报通常低于以前 Airbnb 模式。这套你打算自住没事，未来想退场套利时一个出口被关。"}
+  ],
+  "valuation_judgment": [
+    {"kind": "fact", "text": "HR 估价 £320,000", "evidence_page": 5},
+    {"kind": "judgment", "text": "估价是否合理 → 查 ESPC 同 development 或同 postcode 近 6 个月 2 床现代公寓 closed prices",
+     "rationale": "现代公寓的 comparables 数据特别干净 — 同 development 内 unit 差异主要是楼层 + 朝向 + 视野。看 ESPC 同 postcode 近 6 个月成交，对比 HR 的位置。现代公寓在苏格兰通常是 fixed price 系统（不像 Tenement offers over），HR 通常更贴近成交价（卖方不期待竞价拉升），所以 HR ±2-3% 通常就是真实区间。新房首次交易 vs 二手交易差异显著：新房有建商溢价，5 年后第一次转手通常贬 5-10%（建商溢价消化）。这套 2015 年盖、11 年了，已经过了「新房溢价消化期」，是稳定二手价。"}
+  ],
+  "offer_direction": [
+    {"kind": "judgment", "text": "Fixed price 系统下砍价空间 1-3%，杠杆在 EWS1 + service charge 数据",
+     "rationale": "现代公寓 closing date 罕见，offer 流程接近 England 风格。砍价靠 leverage：(a) 如果 EWS1 没有或评级低，直接 offer HR - 5-10% 并 condition on satisfactory EWS1（接受度高） (b) 如果 service charge 近 3 年涨过 40%+，offer HR - 2-3% 谈让步 (c) 如果都干净，offer HR ±1%。"},
+    {"kind": "judgment", "text": "Mortgage 用 85-90% LTV 是合理的 — 现代公寓 surprise costs 少",
+     "rationale": "和 Tenement 反过来 — 现代公寓第一年 surprise 维修通常 < £2k（建商保还在 / no 共有结构）。所以 cash buffer £10-15k 够。但留出空间给 service charge 涨幅（每年涨 5-10% 累计 3 年是真实场景）。"}
+  ],
+  "viewing_priorities": [
+    {"kind": "judgment", "text": "要 EWS1 / SBA 报告 + 评级",
+     "rationale": "中介经常说「楼里有 EWS1」— 不够，苏格兰可能 each flat separate。要求看正式文件，确认这个 unit 评级是 A1-B1 任意一档。B2 = 不能卖，直接 walk away。没文件 = solicitor 在 missives 阶段强制 condition。"},
+    {"kind": "judgment", "text": "要近 3 年 service charge 涨幅 + 看 Factor 合同到期/hand-over 日期",
+     "rationale": "现代公寓真实成本不是当下 £180/月，是 5 年后 hand-over 之后的数字。建商 factor 合同通常 5-10 年 fixed term；到期后业主自治通常涨 30-50%。问中介：现在 Factor 是谁？合同哪年到期？如果是建商自营 factor，是 hand-over 期已过还是没？"},
+    {"kind": "judgment", "text": "要 Deed of Conditions 全文 — 不是 summary",
+     "rationale": "现代公寓的 Deed of Conditions 是法律 binding 文件，常见限制：不能 short-let / 不能养特定 pet / 不能改 internal layout / 不能换地板材料（隔音）/ balcony 不能种植某些植物。中介只会给 highlight summary。让 solicitor 拿全文，特别看 STL 条款 — 有些 development 在 2022 control area 之前就自己禁了。"}
+  ],
+  "additional_thoughts": [
+    {"kind": "fact", "text": "Fountainbridge 是 1990s 起 brewing district 转型来的",
+     "rationale": "原 McEwan's / Fountain Brewery 等大型啤酒厂，1990s-2010s 逐步关闭重建为 residential + commercial mix。这意味着同区房龄高度集中在 1995-2020 之间，comparables 特别多但也意味着「一片新房同时变老」— 第二次外墙 / 屋顶大修可能整片 development 同时来。"},
+    {"kind": "judgment", "text": "苏格兰 EWS1 vs England：每户可能要 separate 文件",
+     "rationale": "England EWS1 是「一栋楼一份」，苏格兰因为产权结构是 commonhold 而非 leasehold，可能 each flat 需要 separate EWS1（RICS 苏格兰指南）。意味着「邻居刚成功卖出」不证明你也能 — 评级和 lender 接受度可能不同。苏格兰政府 £450m 投资 SBA 计划在推进中，未来 2-3 年这块 framework 还会变。"},
+    {"kind": "judgment", "text": "Edinburgh 2022 STL control area 对投资退路影响是结构性的",
+     "rationale": "Pre-2022 现代公寓很多买家是「自住 3-5 年后转 Airbnb 套利」。这条路被堵之后，现代公寓的 exit liquidity 下降 — 同样的房子，对「想 Airbnb 的下一手买家」失去吸引力，对「自住下一手」依然 OK。这是为什么 2022 后部分 Edinburgh 现代公寓挂牌时间延长，价格小幅承压。"},
+    {"kind": "judgment", "text": "现代公寓在苏格兰产权机制是 owner-occupied with Deed of Conditions",
+     "rationale": "苏格兰没有 leasehold（England 那种 99-year/999-year 租约）。现代公寓是 commonhold 性质：你拥有 unit，按 Deed of Conditions 共享 communal areas 责任。优点是不用担心 leasehold extension 费用；缺点是 deed 一旦签了改不动，所有限制（STL / pet / 改装）都是永久 binding。"},
+    {"kind": "judgment", "text": "Tram extension to Newhaven (2023 通) 对 Fountainbridge 影响有限",
+     "rationale": "Newhaven 段 2023 年开通主要利好 Leith / Newhaven 现代公寓。Fountainbridge 没有 tram 站，最近是 Princes Street 步行 15 分钟。如果中介说「tram 利好房价」是 sell-side bias — 实际数据查 ESPC Fountainbridge 同条件 2023 前后成交对比即可验证（大概率没明显跳涨）。"}
+  ]
+}

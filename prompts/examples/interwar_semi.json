@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "scenario": "Corstorphine 1935 战间期 3-bed semi-detached，cavity wall，slate roof，HR £380k",
+    "use_when": "era ∈ [1919, 1939] 且 building_type 含 'semi' / 'terraced' / 'detached'（非 tenement）",
+    "note": "学 voice 和 grounding 密度，不要照抄数字 / 事实。所有市场数据必须当次 web search 查证，不能凭印象写百分比。"
+  },
+  "overall_positioning": [
+    {"kind": "fact", "text": "1935 战间期 semi-detached，3 床 105 m²，cavity wall + slate", "evidence_page": 4,
+     "quote": "Semi-detached dwelling of cavity brick construction beneath a pitched roof finished in natural slate, circa 1935"},
+    {"kind": "judgment", "text": "Corstorphine 战间期 semi — 过日子的好房，不是套利型资产",
+     "rationale": "这类房子的卖点不是情调或租金回报，是 cavity wall 隔热 + 私家花园 + off-street parking — 养孩子族的标配。爱丁堡市场长期偏好两端（Victorian Tenement 的情调 + 现代公寓的便利），战间期 semi 夹在中间，升值速度通常慢于同区 Victorian Tenement（具体年度对比建议查 ESPC 历史数据）。如果你买这套是奔着「住 7-10 年带娃 + 通勤」，是对的；奔着 5 年套利退场，类型不对。"}
+  ],
+  "score_corrections": [
+    {"kind": "judgment", "text": "External walls Cat 2 是 cavity tie 例行复检建议，不是发现问题，回退 0.5 分",
+     "contradiction_id": "External walls_p15", "score_delta": 0.5,
+     "rationale": "测量员对 1930s cavity wall 普遍 default 给 Cat 2，写法是 'recommend cavity wall tie survey within 10 years'。这是 cover-their-back 标准措辞，不代表已经发现锈蚀。1930s 早期才开始 zinc galvanising，所以 1935 房子的 ties 可能 galvanised 也可能未处理；学术上 1945 之前 ties 寿命「难精确预测」（permagard 行业指南）。Edinburgh 内陆相对干 — 你别真把它当成「快塌了」，但也要承认是欠债项。",
+     "quote": "Cavity wall ties were not exposed for inspection; recommend specialist survey within next 10 years"},
+    {"kind": "judgment", "text": "Boiler Cat 2 实质是「老但工作中」，回退 0.3 分",
+     "contradiction_id": "Heating system_p21", "score_delta": 0.3,
+     "rationale": "notes 写 boiler 2014 年装、'in working order at time of inspection'，但因为已超 10 年保 default Cat 2。boiler 行业典型 lifespan 15-20 年，住进去前 3-5 年不会真出事，但心里要有数。",
+     "quote": "Boiler appears to be functioning at time of inspection but is over 10 years old"}
+  ],
+  "real_concerns": [
+    {"kind": "judgment", "text": "EPC D/56 是真问题，未来 5 年大概率要花 £10-20k 升级",
+     "rationale": "战间期 cavity wall 没 insulation + 单层 steel-frame 窗（如未换）= 取暖费比 Victorian Tenement 还高（后者厚石墙反而保温好，是反直觉的）。EPC 2025 法规如果落地，租赁会被强制 C+；自住短期没事，但你二手转手时买家会按这一笔砍价。好消息是 cavity wall insulation + loft 升级是「打一次工拉一档」的活，全屋 fabric upgrade 行业典型 £8-15k 把 EPC 拉到 C，钱花得直观。"},
+    {"kind": "judgment", "text": "Roof slate 已经 90 年 — 关键不是 slate 本身而是「nail sickness」",
+     "rationale": "Scottish slate 100+ 年寿命很常见（Engine Shed / Historic Environment Scotland 行业资料），所以 slate 本身大概率还能扛。真正的钱坑变量是 nail sickness — 苏格兰湿气导致固定钉子锈穿，slate 一片片往下掉。HR 没说有没有 partial re-fixing 记录。如果原始未动过，下 10-15 年大概率要全屋 re-fix 甚至 re-slate，£15-25k 全自己出（不像 Tenement 能分摊到 6 户）。买这套之前一定问中介上次屋顶有没有动过。"},
+    {"kind": "assumption", "text": "Cavity wall tie 锈蚀风险无法从 HR 判断",
+     "rationale": "1930s 早期 zinc galvanising 才开始普及，1935 房子的 ties 可能受了保护也可能没。首次 corrosion 问题官方识别是 1960s（South Wales），1945 之前的 ties 寿命行业「难精确预测」。Corstorphine 内陆相对干 —— 90 年还没出大问题算正常，但也欠了一次 specialist survey。看房时问最近一次 cavity survey 报告 —— 如果没有，自己花 £200-400 找 specialist 来做，决定要不要 retie。"}
+  ],
+  "valuation_judgment": [
+    {"kind": "fact", "text": "HR 估价 £380,000", "evidence_page": 5},
+    {"kind": "judgment", "text": "估价是否合理 → 查 ESPC EH12 近 6 个月 3 床战间期 semi closed prices 中位数对照",
+     "rationale": "HR 在苏格兰 closed-bid 系统里通常是「偏保守锚点」— 卖方策略往往是「offers over £380k」吸引看房量，等竞价拉到中位数附近。看 ESPC EH12 区近 6 个月同条件成交，对比 HR 落在中位数下方多少 % — 这才是真锚点。中介给的『挂牌后 1 周成交 20 套看房』那种话不算数据。"}
+  ],
+  "offer_direction": [
+    {"kind": "judgment", "text": "Corstorphine 战间期 semi 在 offers over 系统下通常 over HR 5-10% 成交",
+     "rationale": "战间期 semi 在 Corstorphine 的竞争人群比 Marchmont Tenement 稳，不会拉到 15%+ 那种 frenzy。如果卖方挂 offers over £380k，看 ESPC 同条件中位数 M，offer M-1% 是甜蜜点；如果是 fixed price 则按 HR 出 £375k 测下调空间。Closing date 卖方是否设了关键 — 没设说明卖方不期待竞价，offer 直接打到 M 附近即可。"},
+    {"kind": "judgment", "text": "如果卖方是 downsizing 家庭，强调 chain-free + 快速完成能换价格让步",
+     "rationale": "战间期 semi 的典型卖家是 60+ 老人下楼或孩子独立后换公寓。他们最怕 chain breakdown（链上某环节挂掉整个交易黄）。你如果是 cash buyer / mortgage 已 AIP，offer 信里直接说「6 周内可 settle」，他们经常愿意为这个让 1-2 个百分点而不是死磕最高价。"},
+    {"kind": "judgment", "text": "现金 buffer 留 £25-35k 给前 3 年维修",
+     "rationale": "boiler 换 + cavity insulation + 局部 re-slating 大概率第 3-5 年内全部要做。和 Tenement 不同的是这些钱不能分摊，全你自己出，但反过来不用等邻居投票 — 你想做就做。"}
+  ],
+  "viewing_priorities": [
+    {"kind": "judgment", "text": "上屋顶或检查 loft 看 slate 背面 + cavity 顶部",
+     "rationale": "slate 背面如果有大量 delamination 或钉孔锈穿是要换的信号（nail sickness 标志）。loft cavity 顶部能直接看到部分 wall ties 状态。中介如果不让上，本身就是信号。"},
+    {"kind": "judgment", "text": "问窗框是 original steel/wood 还是已换 uPVC，何时换的 — 你住进去第一个冬天就会感觉到",
+     "rationale": "1935 original 是 steel-frame 单玻璃，热损巨大，冬天暖气全往外漏。如果还没换，第一年就要做 £8-12k（行业范围）；如果是 2000 年之前换的 uPVC，那一代密封圈已老化，也要更新。"},
+    {"kind": "judgment", "text": "问花园边界 wall 归属 + 上次重做时间",
+     "rationale": "战间期 semi 共用边界 wall 是常见纠纷源。一面归你一面归邻居（看 title deed）。倒塌时责任分配看产权，重建费 £3-8k 行业范围。中介经常不知道答案，让 solicitor 在 missives 阶段查清楚。"}
+  ],
+  "additional_thoughts": [
+    {"kind": "fact", "text": "Corstorphine 1920 年 11 月 1 日正式 annexe 给 Edinburgh",
+     "rationale": "之前是独立 dairy village（Corstorphine Cream 1740 年就有记录），1920s-30s 大量战间期 stock 建造时正赶上「新加入 Edinburgh」的城市规划红利。同年代 stock 同一波规划 — 外观、布局、conveyancing 风格高度一致，看一套基本能预测整条街。对估价是好事（comparables 多），对个性化品味是坏事（看 5 套像看 1 套）。"},
+    {"kind": "judgment", "text": "Extension potential 通常比 Marchmont 类大",
+     "rationale": "Corstorphine 大部分不在 conservation area。Marchmont 是 Marchmont/Meadows/Bruntsfield Conservation Area（1987 年设，1996 年加 Article 4 Directions），外墙颜色、窗框材料、扩建尺寸都受规划局额外管控。Corstorphine 战间期 semi 做 rear single-storey kitchen-diner 扩建通常 6-8 周批准（个案查 Council planning portal），同类房做过扩建的转手溢价行业经验值在双位数 £k 量级。"},
+    {"kind": "judgment", "text": "学区是 Craigmount High（主要）/ St Augustine's R.C. — 不是顶级",
+     "rationale": "战间期家庭 friendly 但学区不算黄金。Boroughmuir / James Gillespie's 这种南区学区在 Marchmont / Bruntsfield，房价溢价显著（具体百分比看 ESPC 不同 catchment 同等条件对比）。Corstorphine 适合：(a) 走 private school 路线（不在乎 catchment） (b) 觉得 Craigmount 够用 + 想要花园和 parking。注意 Forrester High 服务的是 Sighthill 那一带，不是 Corstorphine 核心。"},
+    {"kind": "fact", "text": "Right-to-buy 历史在战间期 stock 上有真实印记",
+     "rationale": "Edinburgh 1980 年有约 60,000 council homes，Right-to-buy（1980 启动，2016 年 7 月 31 日终止）期间卖了约 27,000 套，现在只剩约 20,000 套社会住房，全市只 15% 是 social housing（数据来源：Edinburgh News 调查报道）。所以战间期 council semi 现在大量在私有市场。Land registry 上能看到原始购买价 £8-15k 这种异常低数字，不影响产权或居住，但 title deed 上有时残留 council 的 restrictive covenant（比如不能开商业、车位限 1 个）。Solicitor 在 missives 阶段会查清楚。"}
+  ]
+}
