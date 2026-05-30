@@ -1,12 +1,18 @@
 """Preference learning signals — diff "actual preference" against preferences.json.
 
-Ground truth = explicit user action: `status` (⭐ 感兴趣 / 💰 已出价 / ❌ 已放弃)
-and `self_score` / `partner_score`. We DO NOT use `self_feeling` / `partner_feeling`
-text frequency — per the user feedback that pre-filtered conditions (bedroom count,
-school catchment) are never discussed in feeling text and would be unfairly downweighted.
+Primary ground truth = `self_score` (0-10). Status is a weak fallback only for
+the positive direction (⭐ 感兴趣 / 💰 已出价 / ✅ 已购入 — these don't happen
+for external reasons). `❌ 已放弃` is intentionally NOT actionable on its own
+because in this user's workflow it overwhelmingly means "funds not ready" or
+"parking until we see something better" — NOT "I disliked this property".
+An overrated signal therefore requires an explicit low self_score, not just
+an abandoned status.
 
-Output is advisory only — never auto-patches preferences.json. The CLI prints
-the suggestions; the user decides whether to apply them.
+`self_feeling` / `partner_feeling` text is shown as a CLI annotation but NEVER
+fed into signal computation (per the feedback that pre-filtered preferences
+like bedroom count never surface in feeling prose).
+
+Output is advisory only — never auto-patches preferences.json.
 """
 
 from __future__ import annotations
@@ -18,17 +24,37 @@ from property_assistant.analysis.scoring import ScoreBreakdown, compute
 from property_assistant.core.property_record import PropertyRecord
 
 
-# Minimum sample size before any analysis runs. Below this, status/score
-# distributions are too noisy to draw conclusions from.
+# Minimum sample size before any analysis runs. Below this, score distributions
+# are too noisy to draw conclusions from.
 MIN_SAMPLE_SIZE = 5
 
-# Status values that signal "user is positive about this property"
-_POSITIVE_STATUSES = {"⭐ 感兴趣", "💰 已出价", "✅ 已购入"}
-_NEGATIVE_STATUSES = {"❌ 已放弃"}
+# Positive status values that are reliable signals — these don't happen for
+# external reasons (you don't ⭐ a property because you ran out of money).
+# Used as a fallback when self_score is absent.
+_STRONG_POSITIVE_STATUSES = {"⭐ 感兴趣", "💰 已出价", "✅ 已购入"}
 
-# Thresholds for status-mismatch detection
-_UNDERRATED_SCORE_MAX = 55   # algo score < 55 but user is positive → algo missed something
-_OVERRATED_SCORE_MIN = 75    # algo score > 75 but user abandoned → algo overweighted something
+# Status fallback self_score when self_score is missing. Tuned to clear the
+# UNDERRATED_SELF_MIN threshold so a starred property without an explicit
+# score still counts as "user liked it".
+_STATUS_FALLBACK_SCORE = 8.0
+
+# Self-score thresholds for mismatch detection
+_UNDERRATED_SCORE_MAX = 55   # algo low + user liked (self ≥ 7) → algo missed something
+_OVERRATED_SCORE_MIN = 75    # algo high + user disliked (self ≤ 4) → algo overweighted something
+_UNDERRATED_SELF_MIN = 7.0
+_OVERRATED_SELF_MAX = 4.0
+
+
+def _effective_self_score(r: PropertyRecord) -> Optional[float]:
+    """Return self_score if set, else a fallback derived from a strong-positive
+    status. Negative status (❌ 已放弃) gets no fallback — it's too noisy in
+    this user's workflow.
+    """
+    if r.self_score is not None:
+        return float(r.self_score)
+    if r.status in _STRONG_POSITIVE_STATUSES:
+        return _STATUS_FALLBACK_SCORE
+    return None
 
 
 @dataclass
@@ -39,9 +65,23 @@ class Evidence:
     self_score: Optional[float]
     status: Optional[str]
     note: str  # e.g. "floor dimension only 2/10 — possibly over-strict"
+    feeling_excerpt: Optional[str] = None  # first ~60 chars of self_feeling, CLI annotation only
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _feeling_excerpt(r: PropertyRecord, limit: int = 60) -> Optional[str]:
+    """Return a short excerpt of self_feeling (or partner_feeling fallback) for
+    CLI display. NEVER used in signal computation — purely a human annotation
+    so the user can see the context behind a signal."""
+    text = r.self_feeling or r.partner_feeling
+    if not text:
+        return None
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "…"
 
 
 @dataclass
@@ -88,14 +128,11 @@ def analyze(records: list[PropertyRecord],
             prefs: Optional[dict] = None) -> PreferenceSignals:
     """Run the full preference-signal analysis.
 
-    `records` should already be filtered to "viewed" properties (the caller
-    decides what "viewed" means). We only consider records that carry an
-    actionable signal — either a status or a self_score.
+    A record is "actionable" if it has either an explicit self_score OR a
+    strong-positive status (⭐ 感兴趣 / 💰 已出价 / ✅ 已购入). `❌ 已放弃` on
+    its own is NOT actionable — see module docstring.
     """
-    actionable = [
-        r for r in records
-        if (r.status in _POSITIVE_STATUSES | _NEGATIVE_STATUSES) or r.self_score is not None
-    ]
+    actionable = [r for r in records if _effective_self_score(r) is not None]
     n = len(actionable)
 
     if n < MIN_SAMPLE_SIZE:
@@ -113,15 +150,18 @@ def analyze(records: list[PropertyRecord],
 
     signals: list[PreferenceSignal] = []
 
-    # ---- Signal 1: status mismatches (algo under/overrated vs user action) ----
-    underrated = _detect_status_mismatches(scored, kind="underrated")
-    overrated = _detect_status_mismatches(scored, kind="overrated")
+    # ---- Signal 1: self-score vs algo mismatches ----
+    underrated = _detect_mismatches(scored, kind="underrated")
+    overrated = _detect_mismatches(scored, kind="overrated")
     if underrated.evidence:
         signals.append(underrated.signal)
     if overrated.evidence:
         signals.append(overrated.signal)
 
-    # ---- Signal 2: low algo-vs-self correlation ----
+    # ---- Signal 2: low algo-vs-self correlation (explicit self_score only) ----
+    # Use only records with explicit self_score for the correlation — don't
+    # contaminate with the status-fallback constant (which would create
+    # artificial clusters at 8.0).
     self_scored = [(r, sb) for r, sb in scored if r.self_score is not None]
     corr: Optional[float] = None
     if len(self_scored) >= MIN_SAMPLE_SIZE:
@@ -145,6 +185,7 @@ def analyze(records: list[PropertyRecord],
                         self_score=r.self_score,
                         status=r.status,
                         note=f"algo {sb.total} vs self {r.self_score}",
+                        feeling_excerpt=_feeling_excerpt(r),
                     ) for r, sb in self_scored
                 ],
             ))
@@ -179,23 +220,33 @@ class _MismatchBucket:
         return self.signal.evidence
 
 
-def _detect_status_mismatches(scored: list[tuple[PropertyRecord, ScoreBreakdown]],
-                              *, kind: str) -> _MismatchBucket:
-    """kind = 'underrated' (algo low but user positive) or 'overrated' (algo high but user gave up)."""
+def _detect_mismatches(scored: list[tuple[PropertyRecord, ScoreBreakdown]],
+                       *, kind: str) -> _MismatchBucket:
+    """kind = 'underrated' (algo low, user liked: effective self ≥ 7)
+       or    'overrated'  (algo high, user disliked: explicit self_score ≤ 4).
+
+    Overrated requires an EXPLICIT self_score — status fallback never fires
+    overrated, because ❌ 已放弃 is too noisy and ⭐ fallback maps to 8.0.
+    """
     matches: list[tuple[PropertyRecord, ScoreBreakdown]] = []
     for r, sb in scored:
+        eff = _effective_self_score(r)
+        if eff is None:
+            continue
         if kind == "underrated":
-            if r.status in _POSITIVE_STATUSES and sb.total < _UNDERRATED_SCORE_MAX:
+            if sb.total < _UNDERRATED_SCORE_MAX and eff >= _UNDERRATED_SELF_MIN:
                 matches.append((r, sb))
-        else:  # overrated
-            if r.status in _NEGATIVE_STATUSES and sb.total >= _OVERRATED_SCORE_MIN:
+        else:  # overrated — explicit self_score required (no status fallback)
+            if (r.self_score is not None
+                    and sb.total >= _OVERRATED_SCORE_MIN
+                    and r.self_score <= _OVERRATED_SELF_MAX):
                 matches.append((r, sb))
 
     if kind == "underrated":
         signal = PreferenceSignal(
             kind="underrated",
             severity="high" if len(matches) >= 2 else "medium",
-            summary=f"算法给低分但你标记为感兴趣/出价/已购：{len(matches)} 套",
+            summary=f"算法给低分但你的 self_score 高（或标记为 ⭐/💰/✅）：{len(matches)} 套",
             suggestion=(
                 "这些房子有评分维度没覆盖到的优点。看每条 evidence 的 note 字段定位"
                 "算法在哪个维度打得最低 → 考虑该维度的阈值是否过严或权重是否太高。"
@@ -205,7 +256,7 @@ def _detect_status_mismatches(scored: list[tuple[PropertyRecord, ScoreBreakdown]
         signal = PreferenceSignal(
             kind="overrated",
             severity="high" if len(matches) >= 2 else "medium",
-            summary=f"算法给高分但你最终放弃：{len(matches)} 套",
+            summary=f"算法给高分但你的 self_score 低（≤4）：{len(matches)} 套",
             suggestion=(
                 "这些房子的算法高分维度可能虚高。看每条 evidence 的 note 找出"
                 "算法给得最满的维度 → 考虑该维度权重是否该降。"
@@ -221,6 +272,7 @@ def _detect_status_mismatches(scored: list[tuple[PropertyRecord, ScoreBreakdown]
             self_score=r.self_score,
             status=r.status,
             note=note,
+            feeling_excerpt=_feeling_excerpt(r),
         ))
         bucket.evidence_records.append((r, sb))
     return bucket
@@ -288,6 +340,7 @@ def _attribute_dimensions(mismatches: list[tuple[PropertyRecord, ScoreBreakdown]
                         self_score=r.self_score,
                         status=r.status,
                         note=f"{dim_name} ratio={ratio:.0%}",
+                        feeling_excerpt=_feeling_excerpt(r),
                     ) for r, sb, ratio in entries
                 ],
             ))
@@ -307,6 +360,7 @@ def _attribute_dimensions(mismatches: list[tuple[PropertyRecord, ScoreBreakdown]
                         self_score=r.self_score,
                         status=r.status,
                         note=f"{dim_name} ratio={ratio:.0%}",
+                        feeling_excerpt=_feeling_excerpt(r),
                     ) for r, sb, ratio in entries
                 ],
             ))

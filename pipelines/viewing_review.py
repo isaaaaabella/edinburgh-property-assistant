@@ -279,6 +279,8 @@ def _cli() -> int:
                         print(f"        - {e.address[:35]:35s} algo={e.algo_score} self={e.self_score} status={e.status or '-'}")
                         if e.note:
                             print(f"            {e.note}")
+                        if e.feeling_excerpt:
+                            print(f"            「{e.feeling_excerpt}」")
                     if len(s.evidence) > 3:
                         print(f"        ...另 {len(s.evidence) - 3} 条")
                 print()

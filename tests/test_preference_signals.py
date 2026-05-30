@@ -135,11 +135,14 @@ def test_underrated_signal_when_algo_low_but_user_likes(prefs):
     assert underrated.severity == "high"  # ≥2 mismatches → high
 
 
-def test_overrated_signal_when_algo_high_but_user_abandoned(prefs):
+def test_overrated_requires_explicit_low_self_score(prefs):
+    """In the new design, ❌ 已放弃 alone is too noisy (could be funds/timing).
+    Overrated signal only fires when the user ALSO gave a low self_score."""
     records = [
-        _high_score_record("Abandoned1", status="❌ 已放弃"),
-        _high_score_record("Abandoned2", status="❌ 已放弃"),
-        # 3 control records with self_score so sample_size ≥ 5
+        # These two ARE overrated mismatches — abandoned AND self_score ≤ 4
+        _high_score_record("HateHigh1", status="❌ 已放弃", self_score=3.0),
+        _high_score_record("HateHigh2", status="❌ 已放弃", self_score=2.5),
+        # 3 control records to clear sample-size guard
         _high_score_record("Neutral1", status="👀 已看", self_score=7.0),
         _high_score_record("Neutral2", status="👀 已看", self_score=7.5),
         _high_score_record("Neutral3", status="👀 已看", self_score=8.0),
@@ -149,6 +152,30 @@ def test_overrated_signal_when_algo_high_but_user_abandoned(prefs):
     assert "overrated" in kinds
     overrated = next(s for s in result.signals if s.kind == "overrated")
     assert len(overrated.evidence) == 2
+
+
+def test_abandoned_without_self_score_is_not_actionable(prefs):
+    """❌ 已放弃 with no self_score is treated as "external reason" (funds/timing)
+    and should not enter the actionable pool. So 5 such records → enough_data=False."""
+    records = [_high_score_record(f"Abandoned{i}", status="❌ 已放弃") for i in range(5)]
+    result = analyze(records, prefs)
+    assert result.enough_data is False
+    assert result.sample_size == 0
+
+
+def test_abandoned_high_self_score_does_not_fire_overrated(prefs):
+    """If user abandoned but gave self_score=8 (e.g. liked but couldn't afford),
+    that's NOT an overrated signal — algo wasn't wrong, external factor was."""
+    records = [
+        _high_score_record(f"LovedButAbandoned{i}", status="❌ 已放弃", self_score=8.0)
+        for i in range(3)
+    ] + [
+        _high_score_record(f"Other{i}", status="👀 已看", self_score=8.0)
+        for i in range(2)
+    ]
+    result = analyze(records, prefs)
+    assert result.enough_data is True
+    assert not any(s.kind == "overrated" for s in result.signals)
 
 
 # ----------------------------------------------------------------------------
@@ -215,3 +242,42 @@ def test_to_dict_is_json_safe(prefs):
     result = analyze(records, prefs)
     # Should be JSON-serialisable end to end
     json.dumps(result.to_dict(), ensure_ascii=False)
+
+
+# ----------------------------------------------------------------------------
+# Feeling excerpt (CLI annotation, NOT a signal input)
+# ----------------------------------------------------------------------------
+
+def test_feeling_excerpt_populates_when_present(prefs):
+    records = [
+        _low_score_record("Cheap1", status="⭐ 感兴趣",
+                          self_feeling="位置不错，邻居安静，价格能接受"),
+        _low_score_record("Cheap2", status="⭐ 感兴趣"),
+        _low_score_record("Cheap3", status="⭐ 感兴趣"),
+        _high_score_record("Other1", status="👀 已看", self_score=8.0),
+        _high_score_record("Other2", status="👀 已看", self_score=8.5),
+    ]
+    result = analyze(records, prefs)
+    underrated = next(s for s in result.signals if s.kind == "underrated")
+    cheap1_ev = next(e for e in underrated.evidence if e.address == "Cheap1")
+    cheap2_ev = next(e for e in underrated.evidence if e.address == "Cheap2")
+    assert cheap1_ev.feeling_excerpt is not None
+    assert "位置不错" in cheap1_ev.feeling_excerpt
+    assert cheap2_ev.feeling_excerpt is None
+
+
+def test_feeling_excerpt_truncates_long_text(prefs):
+    long_text = "这套房子" + "非常喜欢，" * 30  # ~150 chars
+    records = [
+        _low_score_record("CheapVerbose", status="⭐ 感兴趣", self_feeling=long_text),
+        _low_score_record("Cheap2", status="⭐ 感兴趣"),
+        _low_score_record("Cheap3", status="⭐ 感兴趣"),
+        _high_score_record("Other1", status="👀 已看", self_score=8.0),
+        _high_score_record("Other2", status="👀 已看", self_score=8.5),
+    ]
+    result = analyze(records, prefs)
+    underrated = next(s for s in result.signals if s.kind == "underrated")
+    ev = next(e for e in underrated.evidence if e.address == "CheapVerbose")
+    assert ev.feeling_excerpt is not None
+    assert ev.feeling_excerpt.endswith("…")
+    assert len(ev.feeling_excerpt) <= 65   # 60 chars + ellipsis margin
