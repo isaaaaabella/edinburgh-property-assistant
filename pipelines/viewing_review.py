@@ -16,6 +16,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import date
 from typing import Any
 
+from property_assistant.analysis.preference_signals import (
+    PreferenceSignals,
+    analyze as analyze_preferences,
+)
 from property_assistant.analysis.scoring import compute
 from property_assistant.core.property_record import PropertyRecord
 from property_assistant.storage import get_storage
@@ -59,6 +63,7 @@ class ReviewResult:
     gaps: list[Gap] = field(default_factory=list)
     status_counts: dict[str, int] = field(default_factory=dict)
     shortlist: list[str] = field(default_factory=list)   # addresses where status="⭐ 感兴趣"
+    preference_signals: PreferenceSignals | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +72,9 @@ class ReviewResult:
             "gaps": [g.to_dict() for g in self.gaps],
             "status_counts": dict(self.status_counts),
             "shortlist": list(self.shortlist),
+            "preference_signals": (
+                self.preference_signals.to_dict() if self.preference_signals else None
+            ),
         }
 
 
@@ -181,6 +189,10 @@ def run(
                 description=f"打分差距大：你 {r.self_score} vs 伴侣 {r.partner_score}（差 {abs(r.self_score - r.partner_score):.1f}）",
             ))
 
+    # Preference learning — ground truth is status + self_score, not feeling text.
+    # Skipped automatically when sample size < MIN_SAMPLE_SIZE.
+    result.preference_signals = analyze_preferences(viewed)
+
     return result
 
 
@@ -244,6 +256,32 @@ def _cli() -> int:
             print(f"  · {addr}")
         print()
         print(f"建议下一步: /property compare {' '.join(result.shortlist[:3])}")
+        print()
+
+    ps = result.preference_signals
+    if ps:
+        if not ps.enough_data:
+            print(
+                f"💡 偏好信号: 样本不足 ({ps.sample_size} 套有 status/self_score；"
+                f"需要 ≥5 套才能可靠分析)"
+            )
+        elif not ps.signals:
+            corr_str = f"，algo↔self ρ={ps.algo_self_correlation:+.2f}" if ps.algo_self_correlation is not None else ""
+            print(f"💡 偏好信号: 评分与你的偏好一致，无需调整{corr_str}")
+        else:
+            print(f"💡 偏好信号 ({len(ps.signals)} 条建议):")
+            for s in ps.signals:
+                print(f"  · [{s.severity}] {s.summary}")
+                print(f"      建议: {s.suggestion}")
+                if s.evidence:
+                    sample = s.evidence[:3]
+                    for e in sample:
+                        print(f"        - {e.address[:35]:35s} algo={e.algo_score} self={e.self_score} status={e.status or '-'}")
+                        if e.note:
+                            print(f"            {e.note}")
+                    if len(s.evidence) > 3:
+                        print(f"        ...另 {len(s.evidence) - 3} 条")
+                print()
 
     return 0
 
