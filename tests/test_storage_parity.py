@@ -115,6 +115,25 @@ def test_address_is_only_title_field():
 
 # ---------- Machine-callout marker protocol ----------
 
+def test_is_machine_callout_recognises_legacy_html_report():
+    """Pre-marker attach_html_report wrote callouts with the 📋 icon and no
+    [auto:*] prefix. They must still be identified as machine-owned so they
+    don't leak into self_feeling and so the new upsert path can replace them."""
+    ns = NotionStorage.__new__(NotionStorage)
+    legacy = {
+        "type": "callout",
+        "callout": {
+            "rich_text": [{"plain_text": "📊 home_report 分析报告已生成\n🔗 file:///..."}],
+            "icon": {"emoji": "📋"},
+        },
+    }
+    assert ns._is_machine_callout(legacy)
+    from property_assistant.storage.notion_storage import HTML_REPORT_MARKER, TLDR_MARKER
+    assert ns._is_machine_callout(legacy, HTML_REPORT_MARKER)
+    # Legacy callouts are HTML report only — must NOT match the TL;DR marker
+    assert not ns._is_machine_callout(legacy, TLDR_MARKER)
+
+
 def test_is_machine_callout_matches_icon_and_marker():
     from property_assistant.storage.notion_storage import (
         HTML_REPORT_MARKER,

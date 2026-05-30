@@ -466,15 +466,20 @@ class NotionStorage(StorageBackend):
             return False
         callout = block.get("callout") or {}
         icon = (callout.get("icon") or {}).get("emoji")
-        if icon != MACHINE_CALLOUT_ICON:
-            return False
-        if marker is None:
-            return True
         text = "".join(
             (rt.get("plain_text") or (rt.get("text") or {}).get("content") or "")
             for rt in (callout.get("rich_text") or [])
         )
-        return text.startswith(marker)
+        # New protocol: 🤖 icon required; optional marker prefix check
+        if icon == MACHINE_CALLOUT_ICON:
+            return marker is None or text.startswith(marker)
+        # Backward-compat: callouts written by the pre-marker `attach_html_report`
+        # used the 📋 icon and started with "📊 ... 分析报告已生成". Recognise
+        # those so they don't pollute self_feeling and so they can be cleaned up
+        # / replaced by the new machine callout on the next /home-report run.
+        if icon == "📋" and "分析报告已生成" in text:
+            return marker is None or marker == HTML_REPORT_MARKER
+        return False
 
     def _find_machine_callout(self, page_id: str, marker: str) -> str | None:
         for block in self._list_page_children(page_id):

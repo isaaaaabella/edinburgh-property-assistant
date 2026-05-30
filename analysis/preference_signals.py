@@ -46,11 +46,15 @@ _OVERRATED_SELF_MAX = 4.0
 
 
 def _effective_self_score(r: PropertyRecord) -> Optional[float]:
-    """Return self_score if set, else a fallback derived from a strong-positive
-    status. Negative status (❌ 已放弃) gets no fallback — it's too noisy in
-    this user's workflow.
+    """Return self_score if set and in valid 0-10 range, else a fallback
+    derived from a strong-positive status. Negative status (❌ 已放弃) gets
+    no fallback — it's too noisy in this user's workflow.
+
+    Out-of-range self_score (e.g. 80, 90 — looks like someone copied the algo
+    total into the wrong column) is treated as missing rather than fed into
+    Spearman, which would otherwise produce a spurious self-correlation.
     """
-    if r.self_score is not None:
+    if r.self_score is not None and 0.0 <= float(r.self_score) <= 10.0:
         return float(r.self_score)
     if r.status in _STRONG_POSITIVE_STATUSES:
         return _STATUS_FALLBACK_SCORE
@@ -161,8 +165,12 @@ def analyze(records: list[PropertyRecord],
     # ---- Signal 2: low algo-vs-self correlation (explicit self_score only) ----
     # Use only records with explicit self_score for the correlation — don't
     # contaminate with the status-fallback constant (which would create
-    # artificial clusters at 8.0).
-    self_scored = [(r, sb) for r, sb in scored if r.self_score is not None]
+    # artificial clusters at 8.0) or out-of-range values (e.g. someone copied
+    # the algo total into the wrong column, which would inflate ρ).
+    self_scored = [
+        (r, sb) for r, sb in scored
+        if r.self_score is not None and 0.0 <= float(r.self_score) <= 10.0
+    ]
     corr: Optional[float] = None
     if len(self_scored) >= MIN_SAMPLE_SIZE:
         algo_scores = [sb.total for _, sb in self_scored]
@@ -236,8 +244,9 @@ def _detect_mismatches(scored: list[tuple[PropertyRecord, ScoreBreakdown]],
         if kind == "underrated":
             if sb.total < _UNDERRATED_SCORE_MAX and eff >= _UNDERRATED_SELF_MIN:
                 matches.append((r, sb))
-        else:  # overrated — explicit self_score required (no status fallback)
+        else:  # overrated — explicit, in-range self_score required (no status fallback)
             if (r.self_score is not None
+                    and 0.0 <= float(r.self_score) <= 10.0
                     and sb.total >= _OVERRATED_SCORE_MIN
                     and r.self_score <= _OVERRATED_SELF_MAX):
                 matches.append((r, sb))

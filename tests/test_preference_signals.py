@@ -163,6 +163,25 @@ def test_abandoned_without_self_score_is_not_actionable(prefs):
     assert result.sample_size == 0
 
 
+def test_out_of_range_self_score_is_ignored(prefs):
+    """Defends against a real-world data hazard: someone copies the algo total
+    (e.g. 80, 90) into the 0-10 self_score column. Such records must not enter
+    the actionable pool — they would otherwise create a spurious self-correlation
+    by effectively comparing algo to itself."""
+    records = [
+        # 4 records with bogus self_score = algo total + 1 minor offset
+        PropertyRecord(address=f"Bogus{i}", status="❌ 已放弃", self_score=85.0 - i * 5)
+        for i in range(4)
+    ] + [
+        # 1 legitimate record
+        PropertyRecord(address="Real", status="⭐ 感兴趣", self_score=8.0),
+    ]
+    result = analyze(records, prefs)
+    # Only "Real" should be actionable
+    assert result.sample_size == 1
+    assert result.enough_data is False
+
+
 def test_abandoned_high_self_score_does_not_fire_overrated(prefs):
     """If user abandoned but gave self_score=8 (e.g. liked but couldn't afford),
     that's NOT an overrated signal — algo wasn't wrong, external factor was."""
