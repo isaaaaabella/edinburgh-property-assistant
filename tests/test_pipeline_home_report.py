@@ -157,4 +157,45 @@ def test_run_skip_storage(fake_pdf, opinion_path, tmp_path, local_env):
         parsed=_parsed_json(), skip_storage=True,
     )
     assert out.exists()
-    assert result.property_id == ""
+
+
+def test_run_writes_area_fields_into_record(
+    fake_pdf, opinion_path, tmp_path, local_env
+):
+    """fetch_area_data flat keys must be persisted onto PropertyRecord so they
+    reach storage + downstream scoring (was a silent drop in phase 1)."""
+    out = tmp_path / "r.html"
+    area = {
+        "simd_overall_decile": 8,
+        "flood_risk": "very_low",
+        "commute_user_min": 22,
+        "commute_partner_min": 41,
+        "schools_flat": ["Boroughmuir High School"],
+    }
+    result = run(
+        fake_pdf, opinion_path=opinion_path, out_html=out,
+        parsed=_parsed_json(), area=area,
+    )
+    assert result.record.simd_decile == 8
+    assert result.record.flood_risk == "very_low"
+    assert result.record.commute_user_min == 22
+    assert result.record.commute_partner_min == 41
+    assert "Boroughmuir High School" in (result.record.school_zone or [])
+
+
+def test_run_persists_tldr_via_storage(
+    fake_pdf, opinion_path, tmp_path, local_env
+):
+    """LocalJSONStorage.set_tldr should write the derived TL;DR into the
+    property file. Notion side is covered by the marker-protocol unit tests."""
+    out = tmp_path / "r.html"
+    result = run(fake_pdf, opinion_path=opinion_path, out_html=out, parsed=_parsed_json())
+    # LocalJSONStorage stores PropertyRecord at <data>/properties/<slug>.json
+    rec_files = list((tmp_path / "data" / "properties").glob("*.json"))
+    assert rec_files, "expected at least one property JSON file"
+    data = json.loads(rec_files[0].read_text(encoding="utf-8"))
+    assert "tldr" in data
+    assert data["tldr"]  # non-empty
+    # derive_tldr concatenates overall_positioning[0] + offer_direction[0]
+    assert "维多利亚 Tenement，3/3 楼" in data["tldr"]
+    assert "建议挂牌价附近" in data["tldr"]

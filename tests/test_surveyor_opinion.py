@@ -169,6 +169,35 @@ def test_all_findings_by_kind():
     assert [f.text for f in op.all_findings_by_kind("assumption")] == ["c"]
 
 
+def test_derive_tldr_uses_positioning_and_offer():
+    op = SurveyorOpinion(
+        overall_positioning=[F(text="1960s 公寓，2/2 楼")],
+        offer_direction=[F(text="±5% 出价")],
+        valuation_judgment=[F(text="不评论")],
+    )
+    assert op.derive_tldr() == "1960s 公寓，2/2 楼。±5% 出价"
+
+
+def test_derive_tldr_explicit_overrides_derivation():
+    op = SurveyorOpinion(
+        overall_positioning=[F(text="X")],
+        offer_direction=[F(text="Y")],
+    )
+    assert op.derive_tldr(explicit="hand-written") == "hand-written"
+
+
+def test_derive_tldr_falls_back_to_single_section():
+    op_pos_only = SurveyorOpinion(overall_positioning=[F(text="只有定位")])
+    assert op_pos_only.derive_tldr() == "只有定位"
+    op_off_only = SurveyorOpinion(offer_direction=[F(text="只有出价")])
+    assert op_off_only.derive_tldr() == "只有出价"
+
+
+def test_derive_tldr_returns_none_when_empty():
+    op = SurveyorOpinion()
+    assert op.derive_tldr() is None
+
+
 def test_schema_for_llm_has_six_required_sections():
     sch = _schema_for_llm()
     assert set(sch["required"]) == {

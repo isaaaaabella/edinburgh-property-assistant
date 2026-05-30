@@ -170,11 +170,20 @@ def run(
     if area is None and not skip_area and record.postcode:
         area = fetch_area(record.postcode)
     if area:
-        # School zone is the only area datum we currently write back into
-        # PropertyRecord (Notion has its own 学区 multi_select column).
         flat = area.get("schools_flat") or []
         if flat and not record.school_zone:
             record.school_zone = flat
+        # Persist SIMD / flood / commute back to PropertyRecord so they reach
+        # storage (Notion columns + LocalJSON) and downstream scoring/preference
+        # loop. fetch_area_data outputs flat keys — map them onto PropertyRecord.
+        if record.simd_decile is None and area.get("simd_overall_decile") is not None:
+            record.simd_decile = int(area["simd_overall_decile"])
+        if record.flood_risk is None and area.get("flood_risk"):
+            record.flood_risk = str(area["flood_risk"])
+        if record.commute_user_min is None and area.get("commute_user_min") is not None:
+            record.commute_user_min = int(area["commute_user_min"])
+        if record.commute_partner_min is None and area.get("commute_partner_min") is not None:
+            record.commute_partner_min = int(area["commute_partner_min"])
 
     # 2.6 Rightmove listing meta — fills listing_url + asking_price + cover
     cover_url: str | None = None
@@ -227,6 +236,10 @@ def run(
             storage.attach_html_report(pid, str(out_html), "home_report")
         except Exception as exc:  # noqa: BLE001
             print(f"warning: attach_html_report failed: {exc}", file=sys.stderr)
+        try:
+            storage.set_tldr(pid, opinion.derive_tldr())
+        except Exception as exc:  # noqa: BLE001
+            print(f"warning: set_tldr failed: {exc}", file=sys.stderr)
         # Notion-only post-upsert patches (cover image + full viewing datetime)
         if storage_backend_name == "notion" and pid and (cover_url or viewing_iso):
             try:

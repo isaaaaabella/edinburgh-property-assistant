@@ -66,6 +66,14 @@ class StorageBackend(ABC):
     # ---- Artefacts ----
 
     @abstractmethod
+    def set_tldr(self, property_id: str, tldr: str | None) -> None:
+        """Persist a one-sentence executive summary derived from the surveyor opinion.
+
+        Notion: upserts the (single) machine-owned 🎯 callout in the page body.
+        Local: writes into PropertyRecord.notes (or similar — backend's choice).
+        """
+
+    @abstractmethod
     def attach_html_report(self, property_id: str, html_path: str, kind: str) -> str:
         """Attach an HTML report file to the property.
 

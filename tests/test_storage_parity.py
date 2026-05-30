@@ -80,7 +80,7 @@ def test_notion_roundtrip_via_synthetic_page():
     ns = NotionStorage.__new__(NotionStorage)
     properties = ns._record_to_properties(rec)
     fake_page = {"id": "fake-page-id", "properties": properties}
-    rec2 = ns._page_to_record(fake_page)
+    rec2 = ns._page_to_record(fake_page, load_feelings=False)
 
     # Compare fields known to roundtrip cleanly through Notion
     compare = [
@@ -111,6 +111,112 @@ def test_address_is_only_title_field():
         f for f, (_, ntype) in NOTION_FIELD_MAP.items() if ntype == "title"
     ]
     assert title_fields == ["address"]
+
+
+# ---------- Machine-callout marker protocol ----------
+
+def test_is_machine_callout_matches_icon_and_marker():
+    from property_assistant.storage.notion_storage import (
+        HTML_REPORT_MARKER,
+        MACHINE_CALLOUT_ICON,
+        TLDR_MARKER,
+    )
+    ns = NotionStorage.__new__(NotionStorage)
+
+    def callout(text: str, icon: str = MACHINE_CALLOUT_ICON) -> dict:
+        return {
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"plain_text": text}],
+                "icon": {"emoji": icon},
+            },
+        }
+
+    assert ns._is_machine_callout(callout(f"{HTML_REPORT_MARKER} 📊 ..."), HTML_REPORT_MARKER)
+    assert ns._is_machine_callout(callout(f"{TLDR_MARKER} 🎯 ..."), TLDR_MARKER)
+    # Right marker, wrong icon — user-owned content, must not match
+    assert not ns._is_machine_callout(callout(f"{TLDR_MARKER} ...", icon="📋"), TLDR_MARKER)
+    # Right icon, wrong marker — different machine callout, no match for this marker
+    assert not ns._is_machine_callout(callout(f"{HTML_REPORT_MARKER} ..."), TLDR_MARKER)
+    # Without marker arg → any machine callout matches
+    assert ns._is_machine_callout(callout(f"{HTML_REPORT_MARKER} ..."))
+    # Wrong block type
+    assert not ns._is_machine_callout({"type": "paragraph"})
+
+
+def test_load_subjective_feelings_concatenates_user_blocks_only(monkeypatch):
+    from property_assistant.storage.notion_storage import (
+        HTML_REPORT_MARKER,
+        MACHINE_CALLOUT_ICON,
+        TLDR_MARKER,
+    )
+    ns = NotionStorage.__new__(NotionStorage)
+
+    fake_children = [
+        # Machine HTML report callout — must be skipped
+        {
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"plain_text": f"{HTML_REPORT_MARKER} link"}],
+                "icon": {"emoji": MACHINE_CALLOUT_ICON},
+            },
+        },
+        # Machine TL;DR callout — must be skipped
+        {
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"plain_text": f"{TLDR_MARKER} verdict"}],
+                "icon": {"emoji": MACHINE_CALLOUT_ICON},
+            },
+        },
+        # User heading
+        {
+            "type": "heading_3",
+            "heading_3": {"rich_text": [{"plain_text": "2026-05-15 第一次看"}]},
+        },
+        # User paragraph
+        {
+            "type": "paragraph",
+            "paragraph": {"rich_text": [{"plain_text": "通风好，邻居有点吵"}]},
+        },
+        # User bullet
+        {
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {"rich_text": [{"plain_text": "伴侣：很喜欢厨房"}]},
+        },
+    ]
+    monkeypatch.setattr(ns, "_list_page_children", lambda pid: fake_children)
+    out = ns._load_subjective_feelings("fake-id")
+    assert out is not None
+    assert "通风好" in out
+    assert "伴侣：很喜欢厨房" in out
+    assert "2026-05-15 第一次看" in out
+    # Machine callouts must NOT leak into the feeling string
+    assert "link" not in out
+    assert "verdict" not in out
+
+
+def test_load_subjective_feelings_returns_none_when_only_machine_blocks(monkeypatch):
+    from property_assistant.storage.notion_storage import (
+        HTML_REPORT_MARKER,
+        MACHINE_CALLOUT_ICON,
+    )
+    ns = NotionStorage.__new__(NotionStorage)
+    fake = [{
+        "type": "callout",
+        "callout": {
+            "rich_text": [{"plain_text": f"{HTML_REPORT_MARKER} ..."}],
+            "icon": {"emoji": MACHINE_CALLOUT_ICON},
+        },
+    }]
+    monkeypatch.setattr(ns, "_list_page_children", lambda pid: fake)
+    assert ns._load_subjective_feelings("fake-id") is None
+
+
+def test_list_page_children_swallows_errors():
+    ns = NotionStorage.__new__(NotionStorage)
+    # No _headers → _request will raise AttributeError → must return []
+    assert ns._list_page_children("any") == []
 
 
 # ---------- Live Notion round-trip (opt-in) ----------

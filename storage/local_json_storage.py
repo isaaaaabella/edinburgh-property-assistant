@@ -157,6 +157,24 @@ class LocalJSONStorage(StorageBackend):
         with path.open("a", encoding="utf-8") as f:
             f.write(entry.to_json() + "\n")
 
+    def set_tldr(self, property_id: str, tldr: str | None) -> None:
+        """Persist TL;DR on the PropertyRecord file (LocalJSON has no page body)."""
+        path = self._property_path(property_id)
+        if not path.exists():
+            return
+        try:
+            d = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+        if tldr:
+            d["tldr"] = tldr
+        else:
+            d.pop("tldr", None)
+        path.write_text(
+            json.dumps(d, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
     def attach_html_report(self, property_id: str, html_path: str, kind: str) -> str:
         src = Path(html_path).expanduser().resolve()
         if not src.exists():

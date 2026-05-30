@@ -28,6 +28,22 @@ from .base import StorageBackend
 NOTION_API_BASE = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 
+# ----------------------------------------------------------------------------
+# Machine-owned page-body block protocol
+# ----------------------------------------------------------------------------
+#
+# A property page's body is a mix of:
+#   - machine-owned callouts (HTML link, TL;DR) — identified by their icon emoji
+#   - user-owned content (paragraphs, headings, lists) — viewing logs, notes
+#
+# Machine operations are idempotent: find-by-marker → patch-in-place, or append
+# if absent. The user can freely write/edit anything that is NOT a machine
+# callout. Reads of subjective feelings concatenate every user-owned block,
+# skipping machine callouts so they don't pollute the log.
+MACHINE_CALLOUT_ICON = "🤖"  # callout.icon.emoji on every machine-owned block
+HTML_REPORT_MARKER = "[auto:html_report]"  # first chars of the callout text
+TLDR_MARKER = "[auto:tldr]"
+
 
 # PropertyRecord field → (Notion property name, Notion type)
 #
@@ -253,8 +269,13 @@ class NotionStorage(StorageBackend):
                 out[notion_name] = payload
         return out
 
-    def _page_to_record(self, page: dict) -> PropertyRecord:
-        """Convert a Notion page object into a PropertyRecord."""
+    def _page_to_record(self, page: dict, *, load_feelings: bool = True) -> PropertyRecord:
+        """Convert a Notion page object into a PropertyRecord.
+
+        `load_feelings`: if True (default), also fetches page body blocks to
+        populate self_feeling from any user-written paragraphs/headings/lists.
+        Each loaded record costs one extra API call.
+        """
         props = page.get("properties", {}) or {}
         kwargs: dict[str, Any] = {}
         for field_name, (notion_name, ntype) in NOTION_FIELD_MAP.items():
@@ -269,7 +290,43 @@ class NotionStorage(StorageBackend):
         kwargs.setdefault("address", "Unknown address")
         rec = PropertyRecord.from_dict(kwargs)
         rec.storage_id = page.get("id")
+        if load_feelings and rec.storage_id:
+            feeling = self._load_subjective_feelings(rec.storage_id)
+            if feeling:
+                rec.self_feeling = feeling
         return rec
+
+    def _load_subjective_feelings(self, page_id: str) -> str | None:
+        """Concatenate all user-owned text blocks on the page into a single string.
+
+        Skips machine-owned callouts (🤖 icon). Used to surface log-style notes
+        the user writes directly in the Notion page body as PropertyRecord
+        `self_feeling` for preference-loop annotation.
+        """
+        chunks: list[str] = []
+        for block in self._list_page_children(page_id):
+            if self._is_machine_callout(block):
+                continue
+            text = self._extract_block_text(block)
+            if text:
+                chunks.append(text)
+        if not chunks:
+            return None
+        return "\n".join(chunks).strip() or None
+
+    @staticmethod
+    def _extract_block_text(block: dict) -> str:
+        btype = block.get("type")
+        if not btype:
+            return ""
+        body = block.get(btype) or {}
+        rich = body.get("rich_text") or []
+        if not rich:
+            return ""
+        return "".join(
+            (rt.get("plain_text") or (rt.get("text") or {}).get("content") or "")
+            for rt in rich
+        ).strip()
 
     # ---------- StorageBackend impl ----------
 
@@ -356,7 +413,11 @@ class NotionStorage(StorageBackend):
         )
 
     def attach_html_report(self, property_id: str, html_path: str, kind: str) -> str:
-        """Write file:// path into `HTML报告` URL property + add callout summary."""
+        """Write file:// path into `HTML报告` URL property + upsert callout summary.
+
+        Idempotent: the same machine callout (🤖 icon + HTML_REPORT_MARKER prefix)
+        is updated in place on repeat runs rather than appended.
+        """
         url = Path(html_path).expanduser().resolve().as_uri()  # file:///...
         # Update URL property
         self._request(
@@ -364,31 +425,87 @@ class NotionStorage(StorageBackend):
             f"/pages/{property_id}",
             {"properties": {"HTML报告": {"url": url}}},
         )
-        # Append a callout block with summary (idempotency is best-effort:
-        # we always append; old callouts naturally rot but don't corrupt data)
         summary = (
-            f"📊 {kind} 分析报告已生成\n"
+            f"{HTML_REPORT_MARKER} 📊 {kind} 分析报告已生成\n"
             f"🔗 {url}\n"
             f"💡 点击 HTML报告 列在本地浏览器查看完整 layered 分析"
         )
-        self._request(
-            "PATCH",
-            f"/blocks/{property_id}/children",
-            {
-                "children": [
-                    {
-                        "object": "block",
-                        "type": "callout",
-                        "callout": {
-                            "rich_text": [{"type": "text", "text": {"content": summary}}],
-                            "icon": {"type": "emoji", "emoji": "📋"},
-                            "color": "blue_background",
-                        },
-                    }
-                ]
-            },
-        )
+        self._upsert_machine_callout(property_id, marker=HTML_REPORT_MARKER, text=summary)
         return url
+
+    def set_tldr(self, property_id: str, tldr: str | None) -> None:
+        """Upsert the 🎯 TL;DR callout at the top of the page body.
+
+        Passing None removes the callout if present.
+        """
+        if not tldr:
+            self._delete_machine_callout(property_id, marker=TLDR_MARKER)
+            return
+        text = f"{TLDR_MARKER} 🎯 TL;DR：{tldr}"
+        self._upsert_machine_callout(property_id, marker=TLDR_MARKER, text=text)
+
+    # ---------- Machine-callout helpers ----------
+
+    def _list_page_children(self, page_id: str) -> list[dict]:
+        """Return root-level child blocks of a page. Single API call, no pagination
+        (Notion default page_size=100 is plenty for a property page).
+
+        Returns [] on any failure (network error, half-initialised instance used
+        in synthetic tests, etc.) — feeling enrichment is best-effort and must
+        never break the surrounding record load.
+        """
+        try:
+            result = self._request("GET", f"/blocks/{page_id}/children?page_size=100")
+        except (NotionAPIError, AttributeError):
+            return []
+        return result.get("results", []) or []
+
+    @staticmethod
+    def _is_machine_callout(block: dict, marker: str | None = None) -> bool:
+        if block.get("type") != "callout":
+            return False
+        callout = block.get("callout") or {}
+        icon = (callout.get("icon") or {}).get("emoji")
+        if icon != MACHINE_CALLOUT_ICON:
+            return False
+        if marker is None:
+            return True
+        text = "".join(
+            (rt.get("plain_text") or (rt.get("text") or {}).get("content") or "")
+            for rt in (callout.get("rich_text") or [])
+        )
+        return text.startswith(marker)
+
+    def _find_machine_callout(self, page_id: str, marker: str) -> str | None:
+        for block in self._list_page_children(page_id):
+            if self._is_machine_callout(block, marker):
+                return block.get("id")
+        return None
+
+    def _upsert_machine_callout(self, page_id: str, *, marker: str, text: str) -> None:
+        callout_payload = {
+            "rich_text": [{"type": "text", "text": {"content": text[:1900]}}],
+            "icon": {"type": "emoji", "emoji": MACHINE_CALLOUT_ICON},
+            "color": "blue_background",
+        }
+        existing_id = self._find_machine_callout(page_id, marker)
+        if existing_id:
+            self._request(
+                "PATCH",
+                f"/blocks/{existing_id}",
+                {"callout": callout_payload},
+            )
+        else:
+            self._request(
+                "PATCH",
+                f"/blocks/{page_id}/children",
+                {"children": [{"object": "block", "type": "callout", "callout": callout_payload}]},
+            )
+
+    def _delete_machine_callout(self, page_id: str, *, marker: str) -> None:
+        existing_id = self._find_machine_callout(page_id, marker)
+        if existing_id:
+            self._request("DELETE", f"/blocks/{existing_id}", None)
 
     def set_subjective_feedback(
         self,

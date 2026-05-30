@@ -98,6 +98,22 @@ class SurveyorOpinion:
     def all_findings_by_kind(self, kind: str) -> list[Finding]:
         return [f for f in self.all_findings() if f.kind == kind]
 
+    def derive_tldr(self, explicit: str | None = None) -> str | None:
+        """One-sentence executive summary derived from the opinion.
+
+        Mirrors the logic in `render/templates/_base.html.j2` (tldr_box macro)
+        so the same string can be persisted to Notion / used in non-HTML
+        contexts. Falls back gracefully when only one of the two source
+        sections is populated.
+        """
+        if explicit:
+            return explicit
+        pos = self.overall_positioning[0].text if self.overall_positioning else ""
+        off = self.offer_direction[0].text if self.offer_direction else ""
+        if pos and off:
+            return f"{pos}。{off}"
+        return pos or off or None
+
     # ---- Serialisation ----
 
     def to_dict(self) -> dict[str, Any]:
