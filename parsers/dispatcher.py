@@ -146,6 +146,11 @@ def parse(pdf_path: str, debug: bool = False) -> dict:
     re_x["floor_area_m2"] = extract_floor_area(pages_layout)
     re_x["bedrooms"] = extract_bedrooms(pages_layout)
     re_x["council_tax_band"] = extract_council_tax(pages_layout, sections["property_questionnaire"])
+    if re_x["council_tax_band"].value is None:
+        warnings.append(
+            "council_tax_band 未能提取（常见原因：Property Questionnaire 用勾选框，"
+            "pdftotext 读不到勾选的格子）— 请人工核对该房 Council Tax band，不要假设"
+        )
     epc_r, epc_s, epc_ps = extract_epc(pages_layout)
     re_x["epc_rating"] = epc_r
     re_x["epc_score"] = epc_s

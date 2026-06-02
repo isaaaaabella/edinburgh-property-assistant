@@ -242,35 +242,65 @@ def extract_bedrooms(pages: list[str]) -> FieldEvidence:
     return FieldEvidence()
 
 
+def _council_tax_is_unreadable_tickbox(pages: list[str], page_range) -> bool:
+    """True when the council-tax answer is a 'please tick one' checkbox grid
+    rather than a typed letter. pdftotext can't capture which box is ticked, so
+    the band letters A–H render as a bare enumeration. Detect that enumeration
+    (≥4 distinct band letters right after the question) so callers don't blindly
+    grab the first letter ('A') as if it were the answer."""
+    res = _find_in_pages(
+        pages,
+        [r"Which\s+Council\s+Tax\s+[Bb]and[^\n]*\?"],
+        flags=re.I,
+        page_range=page_range,
+    )
+    if not res:
+        return False
+    m, page, _ = res
+    # 0-indexed page; pages list is 0-indexed
+    text = pages[page - 1]
+    window = text[m.end(): m.end() + 220]
+    distinct = {c for c in re.findall(r"(?<![A-Za-z])([A-H])(?![A-Za-z])", window)}
+    return len(distinct) >= 4
+
+
 def extract_council_tax(pages: list[str], pq_range: SectionRange) -> FieldEvidence:
     """
     Council Tax band. Try patterns in order of specificity.
     Allied template uses [x]A / [x]B checkboxes.
     Quest/DM Hall use either same-line or next-line value after the question.
+
+    Guard: when the form is a 'please tick one' grid (band letters render as a
+    bare A–H enumeration in extracted text), we cannot read which box is ticked,
+    so we return unknown rather than mis-grabbing the first letter as the band.
     """
     # Restrict to PQ section if known, else search broadly
     page_range = (pq_range.start_page or 1, pq_range.end_page or len(pages))
-    # Pattern 1: same line: "Which Council Tax band ... is your property in? D"
-    res = _find_in_pages(
-        pages,
-        [r"Which\s+Council\s+Tax\s+[Bb]and[^\n]*?\?\s*([A-H])\b"],
-        flags=re.I,
-        page_range=page_range,
-    )
-    if res:
-        m, page, source = res
-        return FieldEvidence(value=m.group(1).upper(), page=page, source=source)
 
-    # Pattern 2: next line: "Which Council Tax band is your property in?\n   D"
-    res = _find_in_pages(
-        pages,
-        [r"Which\s+Council\s+Tax\s+[Bb]and[^\n]*\n[^\n]*?\b([A-H])\b"],
-        flags=re.I,
-        page_range=page_range,
-    )
-    if res:
-        m, page, source = res
-        return FieldEvidence(value=m.group(1).upper(), page=page, source=source)
+    tickbox = _council_tax_is_unreadable_tickbox(pages, page_range)
+
+    if not tickbox:
+        # Pattern 1: same line: "Which Council Tax band ... is your property in? D"
+        res = _find_in_pages(
+            pages,
+            [r"Which\s+Council\s+Tax\s+[Bb]and[^\n]*?\?\s*([A-H])\b"],
+            flags=re.I,
+            page_range=page_range,
+        )
+        if res:
+            m, page, source = res
+            return FieldEvidence(value=m.group(1).upper(), page=page, source=source)
+
+        # Pattern 2: next line: "Which Council Tax band is your property in?\n   D"
+        res = _find_in_pages(
+            pages,
+            [r"Which\s+Council\s+Tax\s+[Bb]and[^\n]*\n[^\n]*?\b([A-H])\b"],
+            flags=re.I,
+            page_range=page_range,
+        )
+        if res:
+            m, page, source = res
+            return FieldEvidence(value=m.group(1).upper(), page=page, source=source)
 
     # Pattern 3: Allied checkbox style: "[X]A" or "[x]C"
     res = _find_in_pages(

@@ -43,6 +43,21 @@ NOTION_VERSION = "2022-06-28"
 MACHINE_CALLOUT_ICON = "🤖"  # callout.icon.emoji on every machine-owned block
 HTML_REPORT_MARKER = "[auto:html_report]"  # first chars of the callout text
 TLDR_MARKER = "[auto:tldr]"
+OPINION_MARKER = "[auto:opinion]"  # machine callout holding the full 7-section opinion
+
+# Section name → display title for the full-opinion blocks. Mirrors the HTML
+# template (render/templates/_base.html.j2 opinion_detail macro) so Notion and
+# HTML stay in lock-step.
+_OPINION_SECTION_TITLES = {
+    "overall_positioning": "① 整体定位",
+    "score_corrections":   "② 评分校正",
+    "real_concerns":       "③ 真正的关注点",
+    "valuation_judgment":  "④ 估值判断",
+    "offer_direction":     "⑤ 出价方向",
+    "viewing_priorities":  "⑥ 看房当日最关键问题",
+    "additional_thoughts": "💭 评估师的额外思考",
+}
+_OPINION_KIND_LABEL = {"fact": "事实", "judgment": "判断", "assumption": "假设"}
 
 
 # PropertyRecord field → (Notion property name, Notion type)
@@ -388,14 +403,28 @@ class NotionStorage(StorageBackend):
         result = self._query_db(body)
         return [self._page_to_record(p) for p in result.get("results", [])]
 
+    @staticmethod
+    def _comm_signature(entry: CommEntry) -> str:
+        """Stable identity of a comm entry, independent of body text. Re-running
+        email intake on the same inbox must not duplicate bullets."""
+        return f"[{entry.occurred_at}] {entry.category} — {entry.sender}: {entry.subject}"
+
     def append_communication(self, property_id: str, entry: CommEntry) -> None:
-        # Notion-side rich block insertion. We append into the page body; the
-        # heading_3 "📬 沟通记录" structure is created lazily if not present.
-        # For Step 4 we keep it simple: append a single bullet block.
-        bullet = (
-            f"[{entry.occurred_at}] {entry.category} — {entry.sender}: "
-            f"{entry.subject} — {entry.body_excerpt}"
-        )
+        # Notion-side rich block insertion. We append a single bullet into the
+        # page body. Idempotent: skip when a bullet with the same signature
+        # (date + category + sender + subject) already exists, so repeat intake
+        # runs don't pile up duplicates.
+        sig = self._comm_signature(entry)
+        for block in self._list_page_children(property_id):
+            if block.get("type") != "bulleted_list_item":
+                continue
+            existing = "".join(
+                r.get("plain_text", "")
+                for r in (block["bulleted_list_item"].get("rich_text") or [])
+            )
+            if existing.startswith(sig):
+                return  # already logged
+        bullet = f"{sig} — {entry.body_excerpt}"
         self._request(
             "PATCH",
             f"/blocks/{property_id}/children",
@@ -443,6 +472,96 @@ class NotionStorage(StorageBackend):
             return
         text = f"{TLDR_MARKER} 🎯 TL;DR：{tldr}"
         self._upsert_machine_callout(property_id, marker=TLDR_MARKER, text=text)
+
+    def set_opinion(self, property_id: str, opinion: Any) -> None:
+        """Write the full 7-section surveyor opinion as one idempotent machine
+        callout (🤖 icon, OPINION_MARKER) whose children are the section blocks.
+
+        Idempotent by delete-then-recreate: re-running /home-report removes the
+        prior opinion callout (and its child subtree) and writes a fresh one, so
+        the page never accumulates duplicates.
+        """
+        # Remove any prior opinion block (archives its children too).
+        self._delete_machine_callout(property_id, marker=OPINION_MARKER)
+        if opinion is None:
+            return
+        children = self._opinion_child_blocks(opinion)
+        if not children:
+            return
+        header = (
+            f"{OPINION_MARKER} 🎓 评估师完整意见"
+            "（自动生成 · 每次分析覆盖更新 · 与 HTML 报告同源）"
+        )
+        callout_block = {
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"type": "text", "text": {"content": header[:1900]}}],
+                "icon": {"type": "emoji", "emoji": MACHINE_CALLOUT_ICON},
+                "color": "gray_background",
+                "children": children,
+            },
+        }
+        self._request(
+            "PATCH",
+            f"/blocks/{property_id}/children",
+            {"children": [callout_block]},
+        )
+
+    # ---------- Opinion block builders ----------
+
+    @staticmethod
+    def _rt(content: str, *, bold: bool = False, color: str = "default") -> dict:
+        """One Notion rich_text run (content clamped to Notion's 2000-char cap)."""
+        return {
+            "type": "text",
+            "text": {"content": (content or "")[:1900]},
+            "annotations": {"bold": bold, "color": color},
+        }
+
+    @classmethod
+    def _finding_bullet(cls, finding: Any) -> dict:
+        """Render one Finding as a bulleted_list_item with layered rich_text:
+        【kind】 headline — rationale (gray) — quote (italic-ish gray)."""
+        kind = getattr(finding, "kind", "judgment")
+        label = _OPINION_KIND_LABEL.get(kind, kind)
+        runs: list[dict] = [
+            cls._rt(f"【{label}】", bold=True, color="blue"),
+            cls._rt(getattr(finding, "text", "") or "", bold=True),
+        ]
+        page = getattr(finding, "evidence_page", None)
+        if page:
+            runs.append(cls._rt(f"  (p.{page})", color="gray"))
+        rationale = getattr(finding, "rationale", None)
+        if rationale:
+            runs.append(cls._rt(f"\n{rationale}", color="gray"))
+        quote = getattr(finding, "quote", None)
+        if quote:
+            runs.append(cls._rt(f"\n“{quote}”", color="gray"))
+        return {
+            "object": "block",
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {"rich_text": runs},
+        }
+
+    @classmethod
+    def _opinion_child_blocks(cls, opinion: Any) -> list[dict]:
+        """Flatten the opinion into child blocks: per non-empty section, a bold
+        title paragraph followed by one bullet per Finding. Two-level nesting
+        (callout → these), within Notion's single-request limits."""
+        blocks: list[dict] = []
+        for name, title in _OPINION_SECTION_TITLES.items():
+            findings = getattr(opinion, name, None) or []
+            if not findings:
+                continue
+            blocks.append({
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {"rich_text": [cls._rt(title, bold=True)]},
+            })
+            for f in findings:
+                blocks.append(cls._finding_bullet(f))
+        return blocks
 
     # ---------- Machine-callout helpers ----------
 
