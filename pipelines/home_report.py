@@ -240,6 +240,10 @@ def run(
             storage.set_tldr(pid, opinion.derive_tldr())
         except Exception as exc:  # noqa: BLE001
             print(f"warning: set_tldr failed: {exc}", file=sys.stderr)
+        try:
+            storage.set_opinion(pid, opinion)
+        except Exception as exc:  # noqa: BLE001
+            print(f"warning: set_opinion failed: {exc}", file=sys.stderr)
         # Notion-only post-upsert patches (cover image + full viewing datetime)
         if storage_backend_name == "notion" and pid and (cover_url or viewing_iso):
             try:

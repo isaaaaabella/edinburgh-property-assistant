@@ -86,6 +86,20 @@ class StorageBackend(ABC):
         Returns the URL/path that was stored.
         """
 
+    def set_opinion(self, property_id: str, opinion: Any) -> None:
+        """Persist the FULL structured surveyor opinion onto the property page.
+
+        Default: no-op. The HTML report already carries all 7 sections, so
+        backends whose model is "HTML is the artefact" (e.g. local JSON) need
+        do nothing. `NotionStorage` overrides this to write idempotent
+        structured blocks so the Notion page is self-contained (readable on
+        mobile / without opening the local file://  HTML).
+
+        Not abstract on purpose: it's an enhancement, not a contract every
+        backend must satisfy.
+        """
+        return None
+
     @abstractmethod
     def set_subjective_feedback(
         self,

@@ -276,8 +276,11 @@ def test_notion_live_upsert_find_delete():
 def test_factory_returns_local_by_default(monkeypatch, tmp_path):
     monkeypatch.delenv("STORAGE_BACKEND", raising=False)
     monkeypatch.setenv("PROPERTY_DATA_DIR", str(tmp_path / "data"))
-    from property_assistant.storage import get_storage
-    s = get_storage()
+    # Isolate from the developer's real .env (which sets STORAGE_BACKEND=notion):
+    # this asserts the *code-level* default when nothing configures a backend.
+    import property_assistant.storage as storage_pkg
+    monkeypatch.setattr(storage_pkg, "_ensure_env_loaded", lambda: None)
+    s = storage_pkg.get_storage()
     assert s.name == "local"
 
 
